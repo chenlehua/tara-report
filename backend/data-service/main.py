@@ -637,15 +637,32 @@ async def list_reports(
     result = []
     for report in reports:
         cover = db.query(ReportCover).filter(ReportCover.report_id == report.report_id).first()
+        
+        # 统计信息
+        assets_count = db.query(ReportAsset).filter(ReportAsset.report_id == report.report_id).count()
+        tara_count = db.query(ReportTARAResult).filter(ReportTARAResult.report_id == report.report_id).count()
+        attack_trees_count = db.query(ReportAttackTree).filter(ReportAttackTree.report_id == report.report_id).count()
+        
         result.append({
+            "id": report.report_id,
             "report_id": report.report_id,
+            "name": cover.report_title if cover else "TARA报告",
             "project_name": cover.project_name if cover else "",
             "report_title": cover.report_title if cover else "",
             "status": report.status,
-            "created_at": report.created_at.isoformat()
+            "created_at": report.created_at.isoformat(),
+            "file_path": "",
+            "statistics": {
+                "assets_count": assets_count,
+                "threats_count": tara_count,
+                "high_risk_count": 0,
+                "measures_count": tara_count,
+                "attack_trees_count": attack_trees_count
+            }
         })
     
     return {
+        "success": True,
         "total": total,
         "page": page,
         "page_size": page_size,
