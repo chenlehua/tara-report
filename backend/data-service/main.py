@@ -6,6 +6,7 @@ import os
 import sys
 import json
 import uuid
+import httpx
 from datetime import datetime
 from typing import Optional, List
 from pathlib import Path
@@ -15,6 +16,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy.orm import Session
 import io
+
+# 报告服务地址
+REPORT_SERVICE_URL = os.getenv("REPORT_SERVICE_URL", "http://report-service:8002")
 
 # 添加共享模块路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -420,16 +424,141 @@ async def upload_report_data(
 
 @app.get("/api/reports/{report_id}")
 async def get_report_info(report_id: str, db: Session = Depends(get_db)):
-    """获取报告基本信息"""
+    """获取报告完整信息（用于预览）"""
     report = db.query(Report).filter(Report.report_id == report_id).first()
     if not report:
         raise HTTPException(status_code=404, detail="报告不存在")
+    
+    # 获取封面信息
+    cover = db.query(ReportCover).filter(ReportCover.report_id == report_id).first()
+    
+    # 获取定义信息
+    definitions = db.query(ReportDefinitions).filter(ReportDefinitions.report_id == report_id).first()
+    
+    # 获取资产列表
+    assets = db.query(ReportAsset).filter(ReportAsset.report_id == report_id).all()
+    
+    # 获取攻击树
+    attack_trees = db.query(ReportAttackTree).filter(
+        ReportAttackTree.report_id == report_id
+    ).order_by(ReportAttackTree.sort_order).all()
+    
+    # 获取TARA结果
+    tara_results = db.query(ReportTARAResult).filter(
+        ReportTARAResult.report_id == report_id
+    ).order_by(ReportTARAResult.sort_order).all()
+    
+    # 构建图片URL
+    def build_image_url(minio_path):
+        if not minio_path:
+            return None
+        return f"/api/reports/{report_id}/image-by-path?path={minio_path}"
+    
+    # 构建资产列表
+    assets_list = [
+        {
+            "id": asset.asset_id,
+            "name": asset.name,
+            "category": asset.category,
+            "remarks": asset.remarks,
+            "authenticity": asset.authenticity,
+            "integrity": asset.integrity,
+            "non_repudiation": asset.non_repudiation,
+            "confidentiality": asset.confidentiality,
+            "availability": asset.availability,
+            "authorization": asset.authorization
+        }
+        for asset in assets
+    ]
+    
+    # 构建攻击树列表
+    attack_trees_list = [
+        {
+            "asset_id": tree.asset_id,
+            "asset_name": tree.asset_name,
+            "title": tree.title,
+            "image": tree.image,
+            "image_url": build_image_url(tree.image)
+        }
+        for tree in attack_trees
+    ]
+    
+    # 构建TARA结果列表
+    tara_results_list = [
+        {
+            "asset_id": r.asset_id,
+            "asset_name": r.asset_name,
+            "subdomain1": r.subdomain1,
+            "subdomain2": r.subdomain2,
+            "subdomain3": r.subdomain3,
+            "category": r.category,
+            "security_attribute": r.security_attribute,
+            "stride_model": r.stride_model,
+            "threat_scenario": r.threat_scenario,
+            "attack_path": r.attack_path,
+            "wp29_mapping": r.wp29_mapping,
+            "attack_vector": r.attack_vector,
+            "attack_complexity": r.attack_complexity,
+            "privileges_required": r.privileges_required,
+            "user_interaction": r.user_interaction,
+            "safety_impact": r.safety_impact,
+            "financial_impact": r.financial_impact,
+            "operational_impact": r.operational_impact,
+            "privacy_impact": r.privacy_impact,
+            "security_goal": r.security_goal,
+            "security_requirement": r.security_requirement
+        }
+        for r in tara_results
+    ]
+    
+    # 统计信息
+    statistics = {
+        'assets_count': len(assets_list),
+        'threats_count': len(tara_results_list),
+        'high_risk_count': sum(1 for r in tara_results_list if r.get('operational_impact') in ['重大的', '严重的']),
+        'measures_count': len(tara_results_list),
+        'attack_trees_count': len(attack_trees_list)
+    }
     
     return {
         "report_id": report.report_id,
         "status": report.status,
         "created_at": report.created_at.isoformat(),
-        "updated_at": report.updated_at.isoformat() if report.updated_at else None
+        "updated_at": report.updated_at.isoformat() if report.updated_at else None,
+        "report_info": {
+            "id": report.report_id,
+            "name": cover.report_title if cover else "TARA报告",
+            "project_name": cover.project_name if cover else "",
+            "version": cover.version if cover else "1.0",
+            "created_at": report.created_at.isoformat(),
+            "statistics": statistics
+        },
+        "cover": {
+            "report_title": cover.report_title if cover else "",
+            "report_title_en": cover.report_title_en if cover else "",
+            "project_name": cover.project_name if cover else "",
+            "data_level": cover.data_level if cover else "",
+            "document_number": cover.document_number if cover else "",
+            "version": cover.version if cover else "",
+            "author_date": cover.author_date if cover else "",
+            "review_date": cover.review_date if cover else "",
+            "sign_date": cover.sign_date if cover else "",
+            "approve_date": cover.approve_date if cover else ""
+        } if cover else {},
+        "definitions": {
+            "title": definitions.title if definitions else "",
+            "functional_description": definitions.functional_description if definitions else "",
+            "item_boundary_image": build_image_url(definitions.item_boundary_image) if definitions else None,
+            "system_architecture_image": build_image_url(definitions.system_architecture_image) if definitions else None,
+            "software_architecture_image": build_image_url(definitions.software_architecture_image) if definitions else None,
+            "assumptions": definitions.assumptions if definitions else [],
+            "terminology": definitions.terminology if definitions else []
+        } if definitions else {},
+        "assets": assets_list,
+        "dataflow_image": build_image_url(definitions.dataflow_image) if definitions and definitions.dataflow_image else None,
+        "attack_trees": attack_trees_list,
+        "tara_results": tara_results_list,
+        "statistics": statistics
     }
 
 
@@ -886,9 +1015,24 @@ async def upload_batch(
         'images_count': len([p for p in [item_boundary_path, system_arch_path, software_arch_path, dataflow_path] + attack_tree_paths if p])
     }
     
+    # 自动调用报告服务生成Excel报告
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            generate_resp = await client.post(
+                f"{REPORT_SERVICE_URL}/api/reports/{report_id}/generate",
+                params={"format": "xlsx"}
+            )
+            if generate_resp.status_code == 200:
+                print(f"Report {report_id} generated successfully")
+            else:
+                print(f"Failed to generate report {report_id}: {generate_resp.text}")
+    except Exception as e:
+        print(f"Failed to call report service: {e}")
+        # 不阻止返回，让用户可以手动生成
+    
     return {
         'success': True,
-        'message': '数据上传成功',
+        'message': '报告生成成功',
         'report_id': report_id,
         'report_info': {
             'id': report_id,
@@ -896,9 +1040,10 @@ async def upload_batch(
             'project_name': cover_data.get('project_name', ''),
             'version': cover_data.get('version', '1.0'),
             'created_at': datetime.now().isoformat(),
+            'file_path': '',
+            'file_size': 0,
             'statistics': statistics
         },
-        'generate_url': f"/api/reports/{report_id}/generate",
         'download_url': f"/api/reports/{report_id}/download",
         'preview_url': f"/api/reports/{report_id}/preview"
     }

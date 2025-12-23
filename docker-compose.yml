@@ -70,6 +70,7 @@ services:
       - MINIO_ACCESS_KEY=minioadmin
       - MINIO_SECRET_KEY=minioadmin123
       - MINIO_SECURE=false
+      - REPORT_SERVICE_URL=http://report-service:8002
     depends_on:
       mysql:
         condition: service_healthy

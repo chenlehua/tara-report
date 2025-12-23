@@ -15,6 +15,7 @@ dependencies = [
     "sqlalchemy>=2.0.0",
     "pymysql[rsa]>=1.1.0",
     "minio>=7.2.0",
+    "httpx>=0.26.0",
 ]
 
 [tool.setuptools.packages.find]
