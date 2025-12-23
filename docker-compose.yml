@@ -32,7 +32,7 @@ services:
     container_name: tara-frontend
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "30031:30031"
     depends_on:
       - backend
     networks:
