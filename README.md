@@ -37,7 +37,40 @@ tara-report-system/
 
 ## 🚀 快速开始
 
-### 方式一：分别启动
+### 方式一：Docker Compose 一键部署（推荐）
+
+#### 使用 Make 命令（最简单）
+
+```bash
+# 一键构建镜像
+make build
+
+# 一键启动服务
+make up
+
+# 或者一键部署（构建 + 启动）
+make deploy
+```
+
+#### 使用 Docker Compose 命令
+
+```bash
+# 构建并启动
+docker compose up -d
+
+# 仅构建
+docker compose build
+
+# 停止服务
+docker compose down
+```
+
+**访问地址：**
+- 前端界面: http://localhost
+- 后端 API: http://localhost:8000
+- API 文档: http://localhost:8000/docs
+
+### 方式二：本地开发模式
 
 #### 1. 启动后端服务
 
@@ -65,13 +98,22 @@ npm install
 npm run dev
 ```
 
-前端将在 http://localhost:3000 运行。
+前端将在 http://localhost:30031 运行。
 
-### 方式二：使用Docker Compose
+### Make 命令参考
 
-```bash
-docker-compose up -d
-```
+| 命令 | 说明 |
+|------|------|
+| `make build` | 构建所有 Docker 镜像 |
+| `make up` | 启动所有服务（后台运行） |
+| `make down` | 停止并移除所有服务 |
+| `make deploy` | 一键部署（build + up） |
+| `make rebuild` | 强制重新构建并启动 |
+| `make logs` | 查看服务日志 |
+| `make logs-f` | 实时查看日志 |
+| `make status` | 查看服务状态 |
+| `make clean` | 清理 Docker 资源 |
+| `make help` | 显示所有可用命令 |
 
 ## 📖 使用指南
 
