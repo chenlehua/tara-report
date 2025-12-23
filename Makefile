@@ -47,7 +47,7 @@ up:
 	@echo "✅ 服务已启动!"
 	@echo ""
 	@echo "📝 访问地址:"
-	@echo "   前端: http://localhost"
+	@echo "   前端: http://localhost:30031"
 	@echo "   后端API: http://localhost:8000"
 	@echo "   API文档: http://localhost:8000/docs"
 

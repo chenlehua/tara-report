@@ -10,16 +10,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # Set working directory
 WORKDIR /app
 
-# === 1. 彻底清理所有现有 APT 源 ===
-RUN rm -f /etc/apt/sources.list && \
-    rm -rf /etc/apt/sources.list.d/*
+# === 1. 配置 APT 使用阿里云镜像（bookworm）===
+RUN rm -f /etc/apt/sources.list.d/*.sources && \
+    echo "deb https://mirrors.aliyun.com/debian/ bookworm main contrib" > /etc/apt/sources.list && \
+    echo "deb https://mirrors.aliyun.com/debian/ bookworm-updates main contrib" >> /etc/apt/sources.list && \
+    echo "deb https://mirrors.aliyun.com/debian-security bookworm-security main contrib" >> /etc/apt/sources.list
 
-# === 2. 使用 bookworm（Debian 12）的阿里云源 ===
-RUN echo "deb https://mirrors.aliyun.com/debian/ bookworm main non-free non-free-firmware contrib" > /etc/apt/sources.list && \
-    echo "deb https://mirrors.aliyun.com/debian/ bookworm-updates main non-free non-free-firmware contrib" >> /etc/apt/sources.list && \
-    echo "deb https://mirrors.aliyun.com/debian-security bookworm-security main non-free non-free-firmware contrib" >> /etc/apt/sources.list
-
-# === 3. 配置 pip 使用阿里云镜像 ===
+# === 2. 配置 pip 使用阿里云镜像 ===
 RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/ && \
     pip config set global.trusted-host mirrors.aliyun.com
 
