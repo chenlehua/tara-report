@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .common.database import Base, engine
-from .api.routes import router
+from .api import api_router
 
 # 创建FastAPI应用
 app = FastAPI(
@@ -23,8 +23,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 注册路由
-app.include_router(router)
+# 注册API v1路由
+app.include_router(api_router, prefix="/api/v1")
+
+
+@app.get("/")
+async def root():
+    """根端点"""
+    return {
+        "service": "TARA Report Service",
+        "version": "1.0.0",
+        "api_version": "v1"
+    }
 
 
 @app.on_event("startup")

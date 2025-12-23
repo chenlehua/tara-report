@@ -25,11 +25,11 @@ class ReportService:
         """从数据服务获取报告数据"""
         async with httpx.AsyncClient(timeout=30.0) as client:
             endpoints = {
-                'cover': f"{settings.DATA_SERVICE_URL}/api/reports/{report_id}/cover",
-                'definitions': f"{settings.DATA_SERVICE_URL}/api/reports/{report_id}/definitions",
-                'assets': f"{settings.DATA_SERVICE_URL}/api/reports/{report_id}/assets",
-                'attack_trees': f"{settings.DATA_SERVICE_URL}/api/reports/{report_id}/attack-trees",
-                'tara_results': f"{settings.DATA_SERVICE_URL}/api/reports/{report_id}/tara-results",
+                'cover': f"{settings.DATA_SERVICE_URL}/api/v1/reports/{report_id}/cover",
+                'definitions': f"{settings.DATA_SERVICE_URL}/api/v1/reports/{report_id}/definitions",
+                'assets': f"{settings.DATA_SERVICE_URL}/api/v1/reports/{report_id}/assets",
+                'attack_trees': f"{settings.DATA_SERVICE_URL}/api/v1/reports/{report_id}/attack-trees",
+                'tara_results': f"{settings.DATA_SERVICE_URL}/api/v1/reports/{report_id}/tara-results",
             }
             
             data = {}
@@ -177,7 +177,7 @@ class ReportService:
                 "report_id": report_id,
                 "format": format.lower(),
                 "file_size": len(file_content),
-                "download_url": f"/api/reports/{report_id}/download?format={format.lower()}",
+                "download_url": f"/api/v1/reports/{report_id}/download?format={format.lower()}",
                 "file_name": f"{project_name}_{report_id}{suffix}"
             }
         except Exception as e:
@@ -218,16 +218,16 @@ class ReportService:
         downloads = {}
         for gf in generated_files:
             downloads[gf.file_type] = {
-                "url": f"/api/reports/{report_id}/download?format={gf.file_type}",
+                "url": f"/api/v1/reports/{report_id}/download?format={gf.file_type}",
                 "file_size": gf.file_size,
                 "generated_at": gf.generated_at.isoformat() if gf.generated_at else None
             }
         
-        # 构建图片URL
+        # 构建图片URL（指向数据服务）
         def build_image_url(minio_path):
             if not minio_path:
                 return None
-            return f"/api/reports/{report_id}/image-by-path?path={minio_path}"
+            return f"/api/v1/reports/{report_id}/image-by-path?path={minio_path}"
         
         definitions_data = data.get('definitions', {})
         assets_data = data.get('assets', {})

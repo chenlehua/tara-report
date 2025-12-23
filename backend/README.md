@@ -8,9 +8,16 @@ TARA (Threat Analysis and Risk Assessment) 后端服务，用于生成威胁分�
 backend/
 ├── tara-data-service/          # 数据服务 - 数据上传、解析和存储
 │   ├── app/
-│   │   ├── api/                # API 路由
+│   │   ├── api/                # API 模块
 │   │   │   ├── __init__.py
-│   │   │   └── routes.py
+│   │   │   └── v1/             # API v1 版本
+│   │   │       ├── __init__.py
+│   │   │       ├── router.py   # 路由聚合
+│   │   │       └── endpoints/  # 端点模块
+│   │   │           ├── __init__.py
+│   │   │           ├── health.py   # 健康检查
+│   │   │           ├── image.py    # 图片管理
+│   │   │           └── report.py   # 报告管理
 │   │   ├── common/             # 公共模块
 │   │   │   ├── __init__.py
 │   │   │   ├── database.py     # 数据库配置
@@ -30,9 +37,15 @@ backend/
 │
 ├── tara-report-service/        # 报告服务 - 报告生成和下载
 │   ├── app/
-│   │   ├── api/                # API 路由
+│   │   ├── api/                # API 模块
 │   │   │   ├── __init__.py
-│   │   │   └── routes.py
+│   │   │   └── v1/             # API v1 版本
+│   │   │       ├── __init__.py
+│   │   │       ├── router.py   # 路由聚合
+│   │   │       └── endpoints/  # 端点模块
+│   │   │           ├── __init__.py
+│   │   │           ├── health.py   # 健康检查
+│   │   │           └── report.py   # 报告生成
 │   │   ├── common/             # 公共模块
 │   │   │   ├── __init__.py
 │   │   │   ├── database.py
@@ -71,16 +84,19 @@ backend/
 
 **端口：** 8001
 
-**主要 API：**
-- `POST /api/upload/batch` - 批量上传 JSON 和图片
-- `GET /api/reports` - 获取报告列表
-- `GET /api/reports/{report_id}` - 获取报告详情
-- `GET /api/reports/{report_id}/cover` - 获取封面信息
-- `GET /api/reports/{report_id}/definitions` - 获取相关定义
-- `GET /api/reports/{report_id}/assets` - 获取资产列表
-- `GET /api/reports/{report_id}/attack-trees` - 获取攻击树
-- `GET /api/reports/{report_id}/tara-results` - 获取 TARA 分析结果
-- `DELETE /api/reports/{report_id}` - 删除报告
+**主要 API (v1)：**
+- `POST /api/v1/upload/batch` - 批量上传 JSON 和图片
+- `POST /api/v1/images/upload` - 上传图片
+- `GET /api/v1/images/{image_id}` - 获取图片
+- `GET /api/v1/reports` - 获取报告列表
+- `GET /api/v1/reports/{report_id}` - 获取报告详情
+- `GET /api/v1/reports/{report_id}/cover` - 获取封面信息
+- `GET /api/v1/reports/{report_id}/definitions` - 获取相关定义
+- `GET /api/v1/reports/{report_id}/assets` - 获取资产列表
+- `GET /api/v1/reports/{report_id}/attack-trees` - 获取攻击树
+- `GET /api/v1/reports/{report_id}/tara-results` - 获取 TARA 分析结果
+- `DELETE /api/v1/reports/{report_id}` - 删除报告
+- `GET /api/v1/health` - 健康检查
 
 ### tara-report-service (报告服务)
 
@@ -93,11 +109,13 @@ backend/
 
 **端口：** 8002
 
-**主要 API：**
-- `POST /api/reports/{report_id}/generate` - 生成报告 (支持 xlsx/pdf 格式)
-- `GET /api/reports/{report_id}/download` - 下载报告
-- `GET /api/reports/{report_id}/preview` - 获取报告预览数据
-- `GET /api/reports/{report_id}/status` - 获取报告状态
+**主要 API (v1)：**
+- `POST /api/v1/reports/{report_id}/generate` - 生成报告 (支持 xlsx/pdf 格式)
+- `GET /api/v1/reports/{report_id}/download` - 下载报告
+- `GET /api/v1/reports/{report_id}/download/{format}` - 下载指定格式报告
+- `GET /api/v1/reports/{report_id}/preview` - 获取报告预览数据
+- `GET /api/v1/reports/{report_id}/status` - 获取报告状态
+- `GET /api/v1/health` - 健康检查
 
 ## 运行方式
 

@@ -1,5 +1,5 @@
 """
-API路由定义
+报告相关端点
 """
 import io
 import json
@@ -10,19 +10,14 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import text
 
-from ..common.database import get_db
-from ..common.minio_client import get_minio_client
-from ..common.models import ReportImage
-from ..config import settings
-from ..repositories.report import ReportRepository
-from ..services.data import DataService
+from ....common.database import get_db
+from ....common.minio_client import get_minio_client
+from ....config import settings
+from ....repositories.report import ReportRepository
+from ....services.data import DataService
 
 router = APIRouter()
-
-# 临时图片存储（用于在创建报告前上传图片）
-temp_images_db: dict = {}
 
 
 def get_data_service(db: Session = Depends(get_db)) -> DataService:
@@ -31,141 +26,7 @@ def get_data_service(db: Session = Depends(get_db)) -> DataService:
     return DataService(repo)
 
 
-@router.get("/")
-async def root():
-    """API根路径"""
-    return {
-        "name": "TARA Data Service",
-        "version": "1.0.0",
-        "status": "running"
-    }
-
-
-@router.get("/api/health")
-async def health_check(db: Session = Depends(get_db)):
-    """健康检查"""
-    try:
-        db.execute(text("SELECT 1"))
-        db_status = "healthy"
-    except Exception as e:
-        db_status = f"unhealthy: {str(e)}"
-    
-    try:
-        minio = get_minio_client()
-        minio_status = "healthy"
-    except Exception as e:
-        minio_status = f"unhealthy: {str(e)}"
-    
-    return {
-        "status": "healthy" if db_status == "healthy" and minio_status == "healthy" else "degraded",
-        "timestamp": datetime.now().isoformat(),
-        "services": {
-            "database": db_status,
-            "minio": minio_status
-        }
-    }
-
-
-@router.post("/api/images/upload")
-async def upload_image(
-    file: UploadFile = File(...),
-    image_type: str = Form(..., description="图片类型: item_boundary, system_architecture, software_architecture, dataflow, attack_tree"),
-    db: Session = Depends(get_db)
-):
-    """
-    上传图片（临时存储）
-    """
-    # 验证文件类型
-    allowed_extensions = {'.png', '.jpg', '.jpeg', '.gif', '.bmp', '.svg'}
-    file_ext = Path(file.filename).suffix.lower()
-    if file_ext not in allowed_extensions:
-        raise HTTPException(
-            status_code=400,
-            detail=f"不支持的文件格式。支持的格式: {', '.join(allowed_extensions)}"
-        )
-    
-    # 验证图片类型
-    valid_types = ['item_boundary', 'system_architecture', 'software_architecture', 'dataflow', 'attack_tree']
-    if image_type not in valid_types:
-        raise HTTPException(
-            status_code=400,
-            detail=f"无效的图片类型。有效类型: {', '.join(valid_types)}"
-        )
-    
-    # 生成图片ID
-    image_id = DataService.generate_image_id()
-    
-    # 读取文件内容
-    content = await file.read()
-    
-    # 上传到MinIO（使用临时目录）
-    minio = get_minio_client()
-    object_name = f"temp/{image_id}{file_ext}"
-    
-    try:
-        minio.upload_bytes(
-            settings.BUCKET_IMAGES,
-            object_name,
-            content,
-            file.content_type or "image/png"
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"文件上传失败: {str(e)}")
-    
-    # 记录临时图片信息
-    temp_images_db[image_id] = {
-        'id': image_id,
-        'type': image_type,
-        'filename': f"{image_id}{file_ext}",
-        'minio_path': object_name,
-        'original_name': file.filename,
-        'content_type': file.content_type,
-        'file_size': len(content),
-        'created_at': datetime.now().isoformat()
-    }
-    
-    return {
-        "success": True,
-        "message": "图片上传成功",
-        "image_id": image_id,
-        "image_url": f"/api/images/{image_id}",
-        "image_type": image_type
-    }
-
-
-@router.get("/api/images/{image_id}")
-async def get_image(image_id: str, db: Session = Depends(get_db)):
-    """获取图片"""
-    minio = get_minio_client()
-    
-    # 先从临时存储查找
-    if image_id in temp_images_db:
-        image_info = temp_images_db[image_id]
-        try:
-            content = minio.download_file(settings.BUCKET_IMAGES, image_info['minio_path'])
-            return StreamingResponse(
-                io.BytesIO(content),
-                media_type=image_info.get('content_type', 'image/png')
-            )
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"获取图片失败: {str(e)}")
-    
-    # 从数据库查找
-    image = db.query(ReportImage).filter(ReportImage.image_id == image_id).first()
-    if not image:
-        raise HTTPException(status_code=404, detail="图片不存在")
-    
-    try:
-        content = minio.download_file(image.minio_bucket, image.minio_path)
-        return StreamingResponse(
-            io.BytesIO(content),
-            media_type=image.content_type or "image/png"
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取图片失败: {str(e)}")
-
-
-@router.post("/api/reports/upload")
+@router.post("/reports/upload")
 async def upload_report_data(
     json_file: UploadFile = File(None, description="JSON数据文件"),
     json_data: str = Form(None, description="JSON数据字符串"),
@@ -213,7 +74,7 @@ async def upload_report_data(
     }
 
 
-@router.post("/api/upload/batch")
+@router.post("/upload/batch")
 async def upload_batch(
     json_file: UploadFile = File(..., description="JSON数据文件"),
     item_boundary_image: UploadFile = File(None, description="项目边界图"),
@@ -260,12 +121,12 @@ async def upload_batch(
             'file_size': 0,
             'statistics': result['statistics']
         },
-        'download_url': f"/api/reports/{result['report_id']}/download",
-        'preview_url': f"/api/reports/{result['report_id']}/preview"
+        'download_url': f"/api/v1/reports/{result['report_id']}/download",
+        'preview_url': f"/api/v1/reports/{result['report_id']}/preview"
     }
 
 
-@router.get("/api/reports")
+@router.get("/reports")
 async def list_reports(
     page: int = 1,
     page_size: int = 20,
@@ -275,7 +136,7 @@ async def list_reports(
     return service.list_reports(page, page_size)
 
 
-@router.get("/api/reports/{report_id}")
+@router.get("/reports/{report_id}")
 async def get_report_info(
     report_id: str,
     service: DataService = Depends(get_data_service)
@@ -287,7 +148,7 @@ async def get_report_info(
     return result
 
 
-@router.get("/api/reports/{report_id}/cover")
+@router.get("/reports/{report_id}/cover")
 async def get_report_cover(
     report_id: str,
     db: Session = Depends(get_db)
@@ -312,7 +173,7 @@ async def get_report_cover(
     }
 
 
-@router.get("/api/reports/{report_id}/definitions")
+@router.get("/reports/{report_id}/definitions")
 async def get_report_definitions(
     report_id: str,
     db: Session = Depends(get_db)
@@ -335,7 +196,7 @@ async def get_report_definitions(
     }
 
 
-@router.get("/api/reports/{report_id}/assets")
+@router.get("/reports/{report_id}/assets")
 async def get_report_assets(
     report_id: str,
     db: Session = Depends(get_db)
@@ -370,7 +231,7 @@ async def get_report_assets(
     }
 
 
-@router.get("/api/reports/{report_id}/attack-trees")
+@router.get("/reports/{report_id}/attack-trees")
 async def get_report_attack_trees(
     report_id: str,
     db: Session = Depends(get_db)
@@ -393,7 +254,7 @@ async def get_report_attack_trees(
     }
 
 
-@router.get("/api/reports/{report_id}/tara-results")
+@router.get("/reports/{report_id}/tara-results")
 async def get_report_tara_results(
     report_id: str,
     db: Session = Depends(get_db)
@@ -433,7 +294,7 @@ async def get_report_tara_results(
     }
 
 
-@router.get("/api/reports/{report_id}/images/{image_id}")
+@router.get("/reports/{report_id}/images/{image_id}")
 async def get_report_image(
     report_id: str,
     image_id: str,
@@ -458,7 +319,7 @@ async def get_report_image(
         raise HTTPException(status_code=500, detail=f"获取图片失败: {str(e)}")
 
 
-@router.get("/api/reports/{report_id}/image-by-path")
+@router.get("/reports/{report_id}/image-by-path")
 async def get_image_by_path(
     report_id: str,
     path: str,
@@ -496,7 +357,7 @@ async def get_image_by_path(
         raise HTTPException(status_code=500, detail=f"获取图片失败: {str(e)}")
 
 
-@router.delete("/api/reports/{report_id}")
+@router.delete("/reports/{report_id}")
 async def delete_report(
     report_id: str,
     service: DataService = Depends(get_data_service)

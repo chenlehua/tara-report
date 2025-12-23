@@ -166,7 +166,7 @@ class DataService:
             async with httpx.AsyncClient(timeout=120.0) as client:
                 # 生成Excel报告
                 excel_resp = await client.post(
-                    f"{settings.REPORT_SERVICE_URL}/api/reports/{report_id}/generate",
+                    f"{settings.REPORT_SERVICE_URL}/api/v1/reports/{report_id}/generate",
                     params={"format": "xlsx"}
                 )
                 if excel_resp.status_code == 200:
@@ -176,7 +176,7 @@ class DataService:
                 
                 # 生成PDF报告
                 pdf_resp = await client.post(
-                    f"{settings.REPORT_SERVICE_URL}/api/reports/{report_id}/generate",
+                    f"{settings.REPORT_SERVICE_URL}/api/v1/reports/{report_id}/generate",
                     params={"format": "pdf"}
                 )
                 if pdf_resp.status_code == 200:
@@ -202,7 +202,7 @@ class DataService:
         def build_image_url(minio_path):
             if not minio_path:
                 return None
-            return f"/api/reports/{report_id}/image-by-path?path={minio_path}"
+            return f"/api/v1/reports/{report_id}/image-by-path?path={minio_path}"
         
         # 构建资产列表
         assets_list = [
