@@ -54,7 +54,7 @@ services:
   data-service:
     build:
       context: ./backend
-      dockerfile: data-service/Dockerfile
+      dockerfile: tara-data-service/Dockerfile
     container_name: tara-data-service
     restart: unless-stopped
     ports:
@@ -89,7 +89,7 @@ services:
   report-service:
     build:
       context: ./backend
-      dockerfile: report-service/Dockerfile
+      dockerfile: tara-report-service/Dockerfile
     container_name: tara-report-service
     restart: unless-stopped
     ports:

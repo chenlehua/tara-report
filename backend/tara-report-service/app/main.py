@@ -1,0 +1,46 @@
+"""
+TARA报告服务入口
+"""
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from .common.database import Base, engine
+from .api.routes import router
+
+# 创建FastAPI应用
+app = FastAPI(
+    title="TARA Report Service",
+    description="TARA报告生成服务 - 负责生成Excel和PDF报告",
+    version="1.0.0"
+)
+
+# CORS配置
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# 注册路由
+app.include_router(router)
+
+
+@app.on_event("startup")
+async def startup():
+    """启动时初始化数据库"""
+    print("Initializing database...")
+    Base.metadata.create_all(bind=engine)
+    print("Database initialized.")
+
+
+# ==================== 启动函数 ====================
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(
+        "app.main:app",
+        host="0.0.0.0",
+        port=8002,
+        reload=True
+    )
