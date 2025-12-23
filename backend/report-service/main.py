@@ -418,15 +418,70 @@ async def preview_report(report_id: str, db: Session = Depends(get_db)):
             "generated_at": gf.generated_at.isoformat() if gf.generated_at else None
         }
     
-    return {
-        "report_id": report_id,
-        "cover": data.get('cover', {}),
-        "definitions": data.get('definitions', {}),
-        "assets": data.get('assets', {}),
-        "attack_trees": data.get('attack_trees', {}),
-        "tara_results": data.get('tara_results', {}),
-        "downloads": downloads
+    # 获取报告基本信息
+    report = db.query(Report).filter(Report.report_id == report_id).first()
+    cover = db.query(ReportCover).filter(ReportCover.report_id == report_id).first()
+    
+    # 解析数据为前端期望的格式
+    definitions_data = data.get('definitions', {})
+    assets_data = data.get('assets', {})
+    attack_trees_data = data.get('attack_trees', {})
+    tara_results_data = data.get('tara_results', {})
+    
+    # 构建图片URL
+    def build_image_url(minio_path):
+        if not minio_path:
+            return None
+        return f"/api/reports/{report_id}/image-by-path?path={minio_path}"
+    
+    # 处理攻击树，添加image_url
+    attack_trees = []
+    for tree in attack_trees_data.get('attack_trees', []):
+        tree_copy = dict(tree)
+        if tree.get('image'):
+            tree_copy['image_url'] = build_image_url(tree['image'])
+        attack_trees.append(tree_copy)
+    
+    # 计算统计信息
+    assets_list = assets_data.get('assets', [])
+    tara_results_list = tara_results_data.get('results', [])
+    
+    statistics = {
+        'assets_count': len(assets_list),
+        'threats_count': len(tara_results_list),
+        'high_risk_count': sum(1 for r in tara_results_list if r.get('operational_impact') in ['重大的', '严重的']),
+        'measures_count': len(tara_results_list),
+        'attack_trees_count': len(attack_trees)
     }
+    
+    # 构建预览数据（匹配旧API格式）
+    preview_data = {
+        'report_info': {
+            'id': report_id,
+            'name': cover.report_title if cover else 'TARA报告',
+            'project_name': cover.project_name if cover else '',
+            'version': cover.version if cover else '1.0',
+            'created_at': report.created_at.isoformat() if report else '',
+            'file_path': '',
+            'file_size': 0,
+            'statistics': statistics
+        },
+        'cover': data.get('cover', {}),
+        'definitions': {
+            **definitions_data,
+            'item_boundary_image': build_image_url(definitions_data.get('item_boundary_image')),
+            'system_architecture_image': build_image_url(definitions_data.get('system_architecture_image')),
+            'software_architecture_image': build_image_url(definitions_data.get('software_architecture_image'))
+        },
+        'assets': assets_list,
+        'dataflow_image': build_image_url(assets_data.get('dataflow_image')),
+        'attack_trees': attack_trees,
+        'tara_results': tara_results_list,
+        'statistics': statistics,
+        'downloads': downloads
+    }
+    
+    return preview_data
 
 
 @app.get("/api/reports/{report_id}/status")
