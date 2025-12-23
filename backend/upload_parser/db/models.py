@@ -44,10 +44,10 @@ class ImageType(str, enum.Enum):
 
 class ReportStatus(str, enum.Enum):
     """报告状态枚举"""
-    PENDING = "pending"
-    PROCESSING = "processing"
-    COMPLETED = "completed"
-    FAILED = "failed"
+    PENDING = "PENDING"
+    PROCESSING = "PROCESSING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
 
 
 # ==================== 报告主表 ====================

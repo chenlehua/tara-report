@@ -14,7 +14,7 @@ USE tara_db;
 CREATE TABLE IF NOT EXISTS reports (
     id VARCHAR(50) PRIMARY KEY COMMENT '报告ID',
     name VARCHAR(255) COMMENT '报告名称',
-    status ENUM('pending', 'processing', 'completed', 'failed') DEFAULT 'pending' COMMENT '报告状态',
+    status ENUM('PENDING', 'PROCESSING', 'COMPLETED', 'FAILED') DEFAULT 'PENDING' COMMENT '报告状态',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     INDEX idx_report_status (status),

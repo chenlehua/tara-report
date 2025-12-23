@@ -19,7 +19,7 @@
 |------|------|------|
 | id | VARCHAR(50) | 报告ID (主键) |
 | name | VARCHAR(255) | 报告名称 |
-| status | ENUM | 状态: pending/processing/completed/failed |
+| status | ENUM | 状态: PENDING/PROCESSING/COMPLETED/FAILED |
 | created_at | DATETIME | 创建时间 |
 | updated_at | DATETIME | 更新时间 |
 
