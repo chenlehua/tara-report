@@ -1021,17 +1021,28 @@ async def upload_batch(
         'images_count': len([p for p in [item_boundary_path, system_arch_path, software_arch_path, dataflow_path] + attack_tree_paths if p])
     }
     
-    # 自动调用报告服务生成Excel报告
+    # 自动调用报告服务生成Excel和PDF报告
     try:
         async with httpx.AsyncClient(timeout=120.0) as client:
-            generate_resp = await client.post(
+            # 生成Excel报告
+            excel_resp = await client.post(
                 f"{REPORT_SERVICE_URL}/api/reports/{report_id}/generate",
                 params={"format": "xlsx"}
             )
-            if generate_resp.status_code == 200:
-                print(f"Report {report_id} generated successfully")
+            if excel_resp.status_code == 200:
+                print(f"Excel report {report_id} generated successfully")
             else:
-                print(f"Failed to generate report {report_id}: {generate_resp.text}")
+                print(f"Failed to generate Excel report {report_id}: {excel_resp.text}")
+            
+            # 生成PDF报告
+            pdf_resp = await client.post(
+                f"{REPORT_SERVICE_URL}/api/reports/{report_id}/generate",
+                params={"format": "pdf"}
+            )
+            if pdf_resp.status_code == 200:
+                print(f"PDF report {report_id} generated successfully")
+            else:
+                print(f"Failed to generate PDF report {report_id}: {pdf_resp.text}")
     except Exception as e:
         print(f"Failed to call report service: {e}")
         # 不阻止返回，让用户可以手动生成
