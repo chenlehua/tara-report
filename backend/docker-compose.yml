@@ -1,0 +1,137 @@
+version: '3.8'
+
+services:
+  # MySQL数据库
+  mysql:
+    image: mysql:8.0
+    container_name: tara-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: tara_db
+      MYSQL_USER: tara_user
+      MYSQL_PASSWORD: tara_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init-db:/docker-entrypoint-initdb.d
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_password"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - tara-network
+
+  # MinIO对象存储
+  minio:
+    image: minio/minio:latest
+    container_name: tara-minio
+    restart: always
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - tara-network
+
+  # MinIO初始化(创建bucket)
+  minio-init:
+    image: minio/mc:latest
+    container_name: tara-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set myminio http://minio:9000 minioadmin minioadmin;
+      mc mb myminio/tara-images --ignore-existing;
+      mc anonymous set public myminio/tara-images;
+      echo 'MinIO bucket initialized';
+      exit 0;
+      "
+    networks:
+      - tara-network
+
+  # 上传解析服务
+  upload-parser:
+    build:
+      context: .
+      dockerfile: Dockerfile.upload-parser
+    container_name: tara-upload-parser
+    restart: always
+    environment:
+      # MySQL配置
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_USER: tara_user
+      MYSQL_PASSWORD: tara_password
+      MYSQL_DATABASE: tara_db
+      # MinIO配置
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: tara-images
+      MINIO_SECURE: "false"
+    ports:
+      - "8001:8001"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - tara-network
+
+  # 报告生成服务
+  tara-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.tara-api
+    container_name: tara-api
+    restart: always
+    environment:
+      # 上传解析服务地址
+      UPLOAD_PARSER_URL: http://upload-parser:8001
+      # MySQL配置(用于直接查询)
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_USER: tara_user
+      MYSQL_PASSWORD: tara_password
+      MYSQL_DATABASE: tara_db
+      # MinIO配置
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: tara-images
+      MINIO_SECURE: "false"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./reports:/app/reports
+    depends_on:
+      - upload-parser
+    networks:
+      - tara-network
+
+volumes:
+  mysql_data:
+    driver: local
+  minio_data:
+    driver: local
+
+networks:
+  tara-network:
+    driver: bridge
