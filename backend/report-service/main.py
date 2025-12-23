@@ -349,14 +349,9 @@ async def generate_report(
             pass
 
 
-@app.get("/api/reports/{report_id}/download")
-async def download_report(
-    report_id: str,
-    format: str = "xlsx",
-    db: Session = Depends(get_db)
-):
+async def _do_download_report(report_id: str, format: str, db: Session):
     """
-    下载报告
+    内部下载报告逻辑
     
     Args:
         report_id: 报告ID
@@ -396,6 +391,38 @@ async def download_report(
             "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"
         }
     )
+
+
+@app.get("/api/reports/{report_id}/download/{format}")
+async def download_report_with_format(
+    report_id: str,
+    format: str,
+    db: Session = Depends(get_db)
+):
+    """
+    下载报告（格式作为路径参数）
+    
+    Args:
+        report_id: 报告ID
+        format: 报告格式 (xlsx 或 pdf)
+    """
+    return await _do_download_report(report_id, format, db)
+
+
+@app.get("/api/reports/{report_id}/download")
+async def download_report(
+    report_id: str,
+    format: str = "xlsx",
+    db: Session = Depends(get_db)
+):
+    """
+    下载报告（格式作为查询参数）
+    
+    Args:
+        report_id: 报告ID
+        format: 报告格式 (xlsx 或 pdf)
+    """
+    return await _do_download_report(report_id, format, db)
 
 
 @app.get("/api/reports/{report_id}/preview")
