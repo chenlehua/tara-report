@@ -20,10 +20,12 @@ RUN rm -f /etc/apt/sources.list.d/*.sources && \
 RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/ && \
     pip config set global.trusted-host mirrors.aliyun.com
 
-# Install system dependencies
+# Install system dependencies (including Chinese fonts for PDF)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     curl \
+    fonts-wqy-zenhei \
+    fonts-wqy-microhei \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy project files
