@@ -520,19 +520,17 @@ async def get_report_info(report_id: str, db: Session = Depends(get_db)):
         'attack_trees_count': len(attack_trees_list)
     }
     
+    # 返回格式与重构前保持一致
     return {
+        "id": report.report_id,
         "report_id": report.report_id,
+        "name": cover.report_title if cover else "TARA报告",
+        "project_name": cover.project_name if cover else "",
         "status": report.status,
         "created_at": report.created_at.isoformat(),
         "updated_at": report.updated_at.isoformat() if report.updated_at else None,
-        "report_info": {
-            "id": report.report_id,
-            "name": cover.report_title if cover else "TARA报告",
-            "project_name": cover.project_name if cover else "",
-            "version": cover.version if cover else "1.0",
-            "created_at": report.created_at.isoformat(),
-            "statistics": statistics
-        },
+        "file_path": "",
+        "statistics": statistics,
         "cover": {
             "report_title": cover.report_title if cover else "",
             "report_title_en": cover.report_title_en if cover else "",
@@ -554,11 +552,19 @@ async def get_report_info(report_id: str, db: Session = Depends(get_db)):
             "assumptions": definitions.assumptions if definitions else [],
             "terminology": definitions.terminology if definitions else []
         } if definitions else {},
-        "assets": assets_list,
-        "dataflow_image": build_image_url(definitions.dataflow_image) if definitions and definitions.dataflow_image else None,
-        "attack_trees": attack_trees_list,
-        "tara_results": tara_results_list,
-        "statistics": statistics
+        "assets": {
+            "title": "资产列表",
+            "assets": assets_list,
+            "dataflow_image": build_image_url(definitions.dataflow_image) if definitions and definitions.dataflow_image else None
+        },
+        "attack_trees": {
+            "title": "攻击树分析",
+            "attack_trees": attack_trees_list
+        },
+        "tara_results": {
+            "title": "TARA分析结果",
+            "results": tara_results_list
+        }
     }
 
 

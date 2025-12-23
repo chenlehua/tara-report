@@ -456,6 +456,14 @@ async def preview_report(report_id: str, db: Session = Depends(get_db)):
     
     # 构建预览数据（匹配旧API格式）
     preview_data = {
+        'id': report_id,
+        'report_id': report_id,
+        'name': cover.report_title if cover else 'TARA报告',
+        'project_name': cover.project_name if cover else '',
+        'status': report.status if report else 'completed',
+        'created_at': report.created_at.isoformat() if report else '',
+        'file_path': '',
+        'statistics': statistics,
         'report_info': {
             'id': report_id,
             'name': cover.report_title if cover else 'TARA报告',
@@ -473,11 +481,19 @@ async def preview_report(report_id: str, db: Session = Depends(get_db)):
             'system_architecture_image': build_image_url(definitions_data.get('system_architecture_image')),
             'software_architecture_image': build_image_url(definitions_data.get('software_architecture_image'))
         },
-        'assets': assets_list,
-        'dataflow_image': build_image_url(assets_data.get('dataflow_image')),
-        'attack_trees': attack_trees,
-        'tara_results': tara_results_list,
-        'statistics': statistics,
+        'assets': {
+            'title': '资产列表',
+            'assets': assets_list,
+            'dataflow_image': build_image_url(assets_data.get('dataflow_image'))
+        },
+        'attack_trees': {
+            'title': '攻击树分析',
+            'attack_trees': attack_trees
+        },
+        'tara_results': {
+            'title': 'TARA分析结果',
+            'results': tara_results_list
+        },
         'downloads': downloads
     }
     
