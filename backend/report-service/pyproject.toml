@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tara-report-service"
+version = "1.0.0"
+description = "TARA Report Service - 报告生成和下载服务"
+requires-python = ">=3.9"
+dependencies = [
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.27.0",
+    "python-multipart>=0.0.9",
+    "pydantic>=2.5.0",
+    "sqlalchemy>=2.0.0",
+    "pymysql>=1.1.0",
+    "minio>=7.2.0",
+    "cryptography>=41.0.0",
+    "openpyxl>=3.1.2",
+    "pillow>=10.2.0",
+    "reportlab>=4.0.0",
+    "httpx>=0.26.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]

@@ -20,9 +20,11 @@ help:
 	@echo "  make deploy     - 一键部署(build + up)"
 	@echo "  make rebuild    - 强制重新构建并启动"
 	@echo ""
-	@echo "开发命令:"
-	@echo "  make dev        - 启动开发环境"
-	@echo "  make install    - 安装所有依赖"
+	@echo "服务管理:"
+	@echo "  make logs-data     - 查看数据服务日志"
+	@echo "  make logs-report   - 查看报告服务日志"
+	@echo "  make logs-mysql    - 查看MySQL日志"
+	@echo "  make logs-minio    - 查看MinIO日志"
 	@echo ""
 	@echo "清理命令:"
 	@echo "  make clean      - 清理Docker资源"
@@ -48,8 +50,11 @@ up:
 	@echo ""
 	@echo "📝 访问地址:"
 	@echo "   前端: http://localhost:30031"
-	@echo "   后端API: http://localhost:8000"
-	@echo "   API文档: http://localhost:8000/docs"
+	@echo "   数据服务API: http://localhost:8001"
+	@echo "   数据服务文档: http://localhost:8001/docs"
+	@echo "   报告服务API: http://localhost:8002"
+	@echo "   报告服务文档: http://localhost:8002/docs"
+	@echo "   MinIO控制台: http://localhost:9001 (minioadmin/minioadmin123)"
 
 # 停止服务
 down:
@@ -85,22 +90,33 @@ rebuild:
 	docker compose up -d --force-recreate
 	@echo "✅ 重新构建并启动完成!"
 
-# ==================== 开发命令 ====================
+# ==================== 服务日志 ====================
 
-# 启动开发环境
-dev:
-	@echo "🔧 启动开发环境..."
-	@echo "请在两个终端分别运行:"
-	@echo "  终端1 (后端): cd backend && pip install -e . && uvicorn tara_api.main:app --reload"
-	@echo "  终端2 (前端): cd frontend && npm install && npm run dev"
+# 数据服务日志
+logs-data:
+	docker compose logs data-service
 
-# 安装依赖
-install:
-	@echo "📦 安装后端依赖..."
-	cd backend && pip install -e .
-	@echo "📦 安装前端依赖..."
-	cd frontend && npm install
-	@echo "✅ 依赖安装完成!"
+logs-data-f:
+	docker compose logs -f data-service
+
+# 报告服务日志
+logs-report:
+	docker compose logs report-service
+
+logs-report-f:
+	docker compose logs -f report-service
+
+# MySQL日志
+logs-mysql:
+	docker compose logs mysql
+
+# MinIO日志
+logs-minio:
+	docker compose logs minio
+
+# 前端日志
+logs-frontend:
+	docker compose logs frontend
 
 # ==================== 清理命令 ====================
 
@@ -127,36 +143,57 @@ status:
 # 查看容器状态(别名)
 ps: status
 
-# 查看后端日志
-logs-backend:
-	docker compose logs backend
-
-# 查看前端日志
-logs-frontend:
-	docker compose logs frontend
-
 # ==================== 单独服务命令 ====================
 
-# 只构建后端
-build-backend:
-	docker compose build backend
+# 只构建数据服务
+build-data:
+	docker compose build data-service
+
+# 只构建报告服务
+build-report:
+	docker compose build report-service
 
 # 只构建前端
 build-frontend:
 	docker compose build frontend
 
-# 只启动后端
-up-backend:
-	docker compose up -d backend
+# 只启动基础设施(MySQL + MinIO)
+up-infra:
+	docker compose up -d mysql minio
+
+# 只启动数据服务
+up-data:
+	docker compose up -d data-service
+
+# 只启动报告服务
+up-report:
+	docker compose up -d report-service
 
 # 只启动前端
 up-frontend:
 	docker compose up -d frontend
 
-# 进入后端容器
-shell-backend:
-	docker compose exec backend /bin/bash
+# 进入数据服务容器
+shell-data:
+	docker compose exec data-service /bin/bash
 
-# 进入前端容器
-shell-frontend:
-	docker compose exec frontend /bin/sh
+# 进入报告服务容器
+shell-report:
+	docker compose exec report-service /bin/bash
+
+# 进入MySQL容器
+shell-mysql:
+	docker compose exec mysql mysql -u tara -ptara123456 tara_db
+
+# ==================== 开发命令 ====================
+
+# 启动开发环境
+dev:
+	@echo "🔧 启动开发环境..."
+	@echo "1. 首先启动基础设施:"
+	@echo "   make up-infra"
+	@echo ""
+	@echo "2. 然后在各终端分别运行:"
+	@echo "   终端1 (数据服务): cd backend/data-service && pip install -e . && uvicorn main:app --reload --port 8001"
+	@echo "   终端2 (报告服务): cd backend/report-service && pip install -e . && uvicorn main:app --reload --port 8002"
+	@echo "   终端3 (前端): cd frontend && npm install && npm run dev"

@@ -1,22 +1,25 @@
 version: '3.8'
 
 services:
-  # Backend API Service
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: tara-backend
+  # MySQL 数据库服务
+  mysql:
+    image: mysql:8.0
+    container_name: tara-mysql
     restart: unless-stopped
     ports:
-      - "8000:8000"
-    volumes:
-      - backend_uploads:/app/uploads
-      - backend_reports:/app/reports
+      - "3306:3306"
     environment:
-      - PYTHONUNBUFFERED=1
+      MYSQL_ROOT_PASSWORD: root123456
+      MYSQL_DATABASE: tara_db
+      MYSQL_USER: tara
+      MYSQL_PASSWORD: tara123456
+      TZ: Asia/Shanghai
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql/init:/docker-entrypoint-initdb.d
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot123456"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -24,7 +27,101 @@ services:
     networks:
       - tara-network
 
-  # Frontend Web Service
+  # MinIO 对象存储服务
+  minio:
+    image: minio/minio:latest
+    container_name: tara-minio
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - tara-network
+
+  # 数据服务 - 负责数据上传、解析和存储
+  data-service:
+    build:
+      context: ./backend
+      dockerfile: data-service/Dockerfile
+    container_name: tara-data-service
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_USER=tara
+      - MYSQL_PASSWORD=tara123456
+      - MYSQL_DATABASE=tara_db
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin123
+      - MINIO_SECURE=false
+    depends_on:
+      mysql:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - tara-network
+
+  # 报告服务 - 负责报告生成和下载
+  report-service:
+    build:
+      context: ./backend
+      dockerfile: report-service/Dockerfile
+    container_name: tara-report-service
+    restart: unless-stopped
+    ports:
+      - "8002:8002"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_USER=tara
+      - MYSQL_PASSWORD=tara123456
+      - MYSQL_DATABASE=tara_db
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin123
+      - MINIO_SECURE=false
+      - DATA_SERVICE_URL=http://data-service:8001
+    depends_on:
+      data-service:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - tara-network
+
+  # 前端 Web 服务
   frontend:
     build:
       context: ./frontend
@@ -34,15 +131,15 @@ services:
     ports:
       - "30031:30031"
     depends_on:
-      backend:
-        condition: service_healthy
+      - data-service
+      - report-service
     networks:
       - tara-network
 
 volumes:
-  backend_uploads:
+  mysql_data:
     driver: local
-  backend_reports:
+  minio_data:
     driver: local
 
 networks:
