@@ -10,6 +10,7 @@ import httpx
 from datetime import datetime
 from typing import Optional, Dict, Any
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
@@ -385,11 +386,14 @@ async def download_report(
     content_type = "application/pdf" if format.lower() == "pdf" else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     filename = f"{project_name}_{report_id}{suffix}"
     
+    # URL编码文件名以支持中文字符
+    encoded_filename = quote(filename, safe='')
+    
     return StreamingResponse(
         io.BytesIO(content),
         media_type=content_type,
         headers={
-            "Content-Disposition": f'attachment; filename="{filename}"'
+            "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"
         }
     )
 
