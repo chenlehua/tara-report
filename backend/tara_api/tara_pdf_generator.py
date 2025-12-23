@@ -702,9 +702,146 @@ def create_attack_trees_page(data: Dict[str, Any], styles) -> List:
     return elements
 
 
+# ==================== 计算函数 ====================
+def calculate_attack_vector_value(attack_vector: str) -> float:
+    """计算攻击向量指标值"""
+    values = {'网络': 0.85, '邻居': 0.62, '本地': 0.55, '物理': 0.2}
+    return values.get(attack_vector, 0)
+
+def calculate_attack_complexity_value(complexity: str) -> float:
+    """计算攻击复杂度指标值"""
+    values = {'低': 0.77, '高': 0.44}
+    return values.get(complexity, 0)
+
+def calculate_privileges_value(privileges: str) -> float:
+    """计算权限要求指标值"""
+    values = {'无': 0.85, '低': 0.62, '高': 0.27}
+    return values.get(privileges, 0)
+
+def calculate_user_interaction_value(interaction: str) -> float:
+    """计算用户交互指标值"""
+    values = {'不需要': 0.85, '需要': 0.62}
+    return values.get(interaction, 0)
+
+def calculate_attack_feasibility(av: float, ac: float, pr: float, ui: float) -> tuple:
+    """计算攻击可行性"""
+    calc_value = 8.22 * av * ac * pr * ui
+    if calc_value <= 1.05:
+        level = '很低'
+    elif calc_value <= 1.99:
+        level = '低'
+    elif calc_value <= 2.99:
+        level = '中'
+    elif calc_value <= 3.99:
+        level = '高'
+    else:
+        level = '很高'
+    return round(calc_value, 2), level
+
+def calculate_impact_value(impact: str) -> int:
+    """计算影响指标值"""
+    values = {'可忽略不计的': 0, '中等的': 1, '重大的': 10, '严重的': 1000}
+    return values.get(impact, 0)
+
+def get_impact_notes(impact_type: str, impact: str) -> str:
+    """获取影响注释"""
+    notes = {
+        'safety': {
+            '可忽略不计的': '没有受伤',
+            '中等的': '轻伤和中等伤害',
+            '重大的': '严重伤害(生存概率高)',
+            '严重的': '危及生命或致命伤害'
+        },
+        'financial': {
+            '可忽略不计的': '财务损失不会产生任何影响',
+            '中等的': '财务损失会产生中等影响',
+            '重大的': '财务损失会产生重大影响',
+            '严重的': '财务损失会产生严重影响'
+        },
+        'operational': {
+            '可忽略不计的': '不会导致车辆功能减少',
+            '中等的': '会导致车辆功能中等减少',
+            '重大的': '会导致车辆功能重大减少',
+            '严重的': '会导致车辆功能丧失'
+        },
+        'privacy': {
+            '可忽略不计的': '隐私危害不会产生任何影响',
+            '中等的': '隐私危害会产生中等影响',
+            '重大的': '隐私危害会产生重大影响',
+            '严重的': '隐私危害会产生严重影响'
+        }
+    }
+    return notes.get(impact_type, {}).get(impact, '')
+
+def calculate_impact_level(total: int) -> str:
+    """计算影响等级"""
+    if total >= 1000:
+        return '严重的'
+    elif total >= 100:
+        return '重大的'
+    elif total >= 10:
+        return '中等的'
+    elif total >= 1:
+        return '可忽略不计的'
+    return '无影响'
+
+def calculate_risk_level(impact_level: str, feasibility_level: str) -> str:
+    """计算风险等级"""
+    # QM条件
+    if impact_level == '无影响' and feasibility_level == '无':
+        return 'QM'
+    # Low条件
+    low_conditions = [
+        (impact_level == '无影响' and feasibility_level != '无'),
+        (impact_level == '可忽略不计的' and feasibility_level in ['很低', '低', '中']),
+        (impact_level == '中等的' and feasibility_level in ['很低', '低']),
+        (impact_level == '重大的' and feasibility_level == '很低')
+    ]
+    if any(low_conditions):
+        return 'Low'
+    # Medium条件
+    medium_conditions = [
+        (impact_level == '可忽略不计的' and feasibility_level in ['高', '很高']),
+        (impact_level == '中等的' and feasibility_level == '中'),
+        (impact_level == '重大的' and feasibility_level == '低'),
+        (impact_level == '严重的' and feasibility_level == '很低')
+    ]
+    if any(medium_conditions):
+        return 'Medium'
+    # High条件
+    high_conditions = [
+        (impact_level == '中等的' and feasibility_level in ['高', '很高']),
+        (impact_level == '重大的' and feasibility_level == '中'),
+        (impact_level == '严重的' and feasibility_level == '低')
+    ]
+    if any(high_conditions):
+        return 'High'
+    return 'Critical'
+
+def get_risk_treatment(risk_level: str) -> str:
+    """获取风险处置决策"""
+    if risk_level in ['QM', 'Low']:
+        return '保留风险'
+    elif risk_level == 'Medium':
+        return '降低风险'
+    return '降低风险/规避风险/转移风险'
+
+def get_wp29_control(stride_model: str) -> str:
+    """获取WP29控制映射"""
+    mapping = {
+        'T篡改': 'M10',
+        'D拒绝服务': 'M13',
+        'I信息泄露': 'M11',
+        'S欺骗': 'M23',
+        'R抵赖': 'M24',
+        'E权限提升': 'M16'
+    }
+    return mapping.get(stride_model, '')
+
+
 # ==================== TARA分析结果页（横向） ====================
 def create_tara_results_page(data: Dict[str, Any], styles) -> List:
-    """创建TARA分析结果页 - 使用简化表格"""
+    """创建TARA分析结果页 - 与Excel报告保持一致，包含自动计算列"""
     elements = []
     
     # 页面标题
@@ -724,11 +861,12 @@ def create_tara_results_page(data: Dict[str, Any], styles) -> List:
         elements.append(create_section_header(threat_title, styles))
         elements.append(Spacer(1, 4))
         
-        # 基本信息表
+        # ========== 1. 资产识别 Asset Identification ==========
+        elements.append(Paragraph('<b>1. 资产识别 Asset Identification</b>', styles['TARABody']))
         basic_data = [
             ['资产ID', result.get('asset_id', ''), '资产名称', result.get('asset_name', '')],
-            ['分类', result.get('category', ''), '安全属性', result.get('security_attribute', '').replace('\n', ' ')],
-            ['STRIDE模型', result.get('stride_model', ''), 'WP29映射', result.get('wp29_mapping', '').replace('\n', ', ')],
+            ['子领域一', result.get('subdomain1', ''), '子领域二', result.get('subdomain2', '')],
+            ['子领域三', result.get('subdomain3', ''), '分类', result.get('category', '')],
         ]
         
         basic_table = Table(basic_data, colWidths=[60, 170, 60, 180])
@@ -745,87 +883,176 @@ def create_tara_results_page(data: Dict[str, Any], styles) -> List:
         elements.append(basic_table)
         elements.append(Spacer(1, 4))
         
-        # 威胁场景
-        elements.append(Paragraph(f"<b>威胁场景:</b> {result.get('threat_scenario', '')}", styles['TARABody']))
-        
-        # 攻击路径
-        attack_path = result.get('attack_path', '')
-        if attack_path:
-            elements.append(Paragraph(f"<b>攻击路径:</b> {attack_path[:200]}{'...' if len(attack_path) > 200 else ''}", styles['TARABody']))
-        elements.append(Spacer(1, 4))
-        
-        # 威胁分析表
-        threat_analysis_data = [
-            ['攻击向量', '攻击复杂度', '权限要求', '用户交互'],
-            [
-                result.get('attack_vector', ''),
-                result.get('attack_complexity', ''),
-                result.get('privileges_required', ''),
-                result.get('user_interaction', '')
-            ]
+        # ========== 2. 威胁&损害场景 Threat & Damage Scenario ==========
+        elements.append(Paragraph('<b>2. 威胁&损害场景 Threat &amp; Damage Scenario</b>', styles['TARABody']))
+        threat_scenario_data = [
+            ['安全属性', result.get('security_attribute', '').replace('\n', ' '), 'STRIDE模型', result.get('stride_model', '')],
+            ['WP29映射', result.get('wp29_mapping', '').replace('\n', ', '), '', ''],
         ]
-        
-        threat_table = Table(threat_analysis_data, colWidths=[120, 120, 120, 120])
-        threat_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), TARAColors.MEDIUM_BLUE),
-            ('TEXTCOLOR', (0, 0), (-1, 0), TARAColors.WHITE),
+        ts_table = Table(threat_scenario_data, colWidths=[60, 170, 60, 180])
+        ts_table.setStyle(TableStyle([
             ('FONTNAME', (0, 0), (-1, -1), CHINESE_FONT),
             ('FONTSIZE', (0, 0), (-1, -1), 8),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('BACKGROUND', (0, 0), (0, -1), TARAColors.LIGHT_BLUE),
+            ('BACKGROUND', (2, 0), (2, 0), TARAColors.LIGHT_BLUE),
             ('GRID', (0, 0), (-1, -1), 0.5, TARAColors.GRAY),
-            ('TOPPADDING', (0, 0), (-1, -1), 4),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('SPAN', (1, 1), (3, 1)),
+        ]))
+        elements.append(ts_table)
+        
+        # 威胁场景和攻击路径
+        elements.append(Paragraph(f"<b>潜在威胁场景:</b> {result.get('threat_scenario', '')}", styles['TARABody']))
+        attack_path = result.get('attack_path', '')
+        if attack_path:
+            elements.append(Paragraph(f"<b>攻击路径:</b> {attack_path}", styles['TARABody']))
+        elements.append(Spacer(1, 4))
+        
+        # ========== 3. 威胁分析 Threat Analysis ==========
+        elements.append(Paragraph('<b>3. 威胁分析 Threat Analysis</b>', styles['TARABody']))
+        
+        # 获取原始值
+        attack_vector = result.get('attack_vector', '本地')
+        attack_complexity = result.get('attack_complexity', '低')
+        privileges_required = result.get('privileges_required', '低')
+        user_interaction = result.get('user_interaction', '不需要')
+        
+        # 计算指标值
+        av_value = calculate_attack_vector_value(attack_vector)
+        ac_value = calculate_attack_complexity_value(attack_complexity)
+        pr_value = calculate_privileges_value(privileges_required)
+        ui_value = calculate_user_interaction_value(user_interaction)
+        
+        # 计算攻击可行性
+        feasibility_calc, feasibility_level = calculate_attack_feasibility(av_value, ac_value, pr_value, ui_value)
+        
+        threat_analysis_data = [
+            ['项目', '攻击向量(V)', '攻击复杂度(C)', '权限要求(P)', '用户交互(U)', '攻击可行性'],
+            ['内容', attack_vector, attack_complexity, privileges_required, user_interaction, ''],
+            ['指标值', f'{av_value}', f'{ac_value}', f'{pr_value}', f'{ui_value}', f'计算值: {feasibility_calc}'],
+            ['等级', '', '', '', '', feasibility_level],
+        ]
+        
+        threat_table = Table(threat_analysis_data, colWidths=[50, 75, 75, 75, 75, 100])
+        threat_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), TARAColors.MEDIUM_BLUE),
+            ('BACKGROUND', (0, 1), (0, -1), TARAColors.LIGHT_BLUE),
+            ('TEXTCOLOR', (0, 0), (-1, 0), TARAColors.WHITE),
+            ('FONTNAME', (0, 0), (-1, -1), CHINESE_FONT),
+            ('FONTSIZE', (0, 0), (-1, -1), 7),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('GRID', (0, 0), (-1, -1), 0.5, TARAColors.GRAY),
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+            ('SPAN', (5, 1), (5, 2)),
         ]))
         elements.append(threat_table)
         elements.append(Spacer(1, 4))
         
-        # 影响分析表
+        # ========== 4. 影响分析 Impact Analysis ==========
+        elements.append(Paragraph('<b>4. 影响分析 Impact Analysis</b>', styles['TARABody']))
+        
+        # 获取影响值
+        safety_impact = result.get('safety_impact', '中等的')
+        financial_impact = result.get('financial_impact', '中等的')
+        operational_impact = result.get('operational_impact', '重大的')
+        privacy_impact = result.get('privacy_impact', '可忽略不计的')
+        
+        # 计算影响指标值
+        safety_value = calculate_impact_value(safety_impact)
+        financial_value = calculate_impact_value(financial_impact)
+        operational_value = calculate_impact_value(operational_impact)
+        privacy_value = calculate_impact_value(privacy_impact)
+        
+        # 计算影响等级
+        impact_total = safety_value + financial_value + operational_value + privacy_value
+        impact_level = calculate_impact_level(impact_total)
+        
         impact_data = [
-            ['安全影响', '经济影响', '操作影响', '隐私影响'],
-            [
-                result.get('safety_impact', ''),
-                result.get('financial_impact', ''),
-                result.get('operational_impact', ''),
-                result.get('privacy_impact', '')
-            ]
+            ['项目', '安全(Safety)', '经济(Financial)', '操作(Operational)', '隐私(Privacy)', '影响等级'],
+            ['内容', safety_impact, financial_impact, operational_impact, privacy_impact, ''],
+            ['注释', get_impact_notes('safety', safety_impact)[:15] + '...', 
+                    get_impact_notes('financial', financial_impact)[:15] + '...',
+                    get_impact_notes('operational', operational_impact)[:15] + '...',
+                    get_impact_notes('privacy', privacy_impact)[:15] + '...', ''],
+            ['指标值', str(safety_value), str(financial_value), str(operational_value), str(privacy_value), f'总计: {impact_total}'],
+            ['等级', '', '', '', '', impact_level],
         ]
         
-        impact_table = Table(impact_data, colWidths=[120, 120, 120, 120])
+        impact_table = Table(impact_data, colWidths=[50, 80, 80, 80, 80, 80])
         impact_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), TARAColors.MEDIUM_BLUE),
+            ('BACKGROUND', (0, 1), (0, -1), TARAColors.LIGHT_BLUE),
+            ('TEXTCOLOR', (0, 0), (-1, 0), TARAColors.WHITE),
+            ('FONTNAME', (0, 0), (-1, -1), CHINESE_FONT),
+            ('FONTSIZE', (0, 0), (-1, -1), 7),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('GRID', (0, 0), (-1, -1), 0.5, TARAColors.GRAY),
+            ('TOPPADDING', (0, 0), (-1, -1), 2),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+            ('SPAN', (5, 1), (5, 3)),
+        ]))
+        elements.append(impact_table)
+        elements.append(Spacer(1, 4))
+        
+        # ========== 5. 风险评估 & 处置 Risk Assessment & Treatment ==========
+        elements.append(Paragraph('<b>5. 风险评估与处置 Risk Assessment &amp; Treatment</b>', styles['TARABody']))
+        
+        # 计算风险等级和处置决策
+        risk_level = calculate_risk_level(impact_level, feasibility_level)
+        risk_treatment = get_risk_treatment(risk_level)
+        wp29_control = get_wp29_control(result.get('stride_model', ''))
+        
+        # 风险等级颜色
+        risk_color = get_risk_color(risk_level)
+        
+        risk_data = [
+            ['风险等级\nRisk Level', '风险处置决策\nRisk Treatment', '安全目标\nSecurity Goal', 'WP29控制映射'],
+            [risk_level, risk_treatment, 
+             '/' if risk_treatment == '保留风险' else '需要定义安全目标',
+             wp29_control],
+        ]
+        
+        risk_table = Table(risk_data, colWidths=[100, 130, 140, 100])
+        risk_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), TARAColors.MEDIUM_BLUE),
             ('TEXTCOLOR', (0, 0), (-1, 0), TARAColors.WHITE),
             ('FONTNAME', (0, 0), (-1, -1), CHINESE_FONT),
             ('FONTSIZE', (0, 0), (-1, -1), 8),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ('GRID', (0, 0), (-1, -1), 0.5, TARAColors.GRAY),
             ('TOPPADDING', (0, 0), (-1, -1), 4),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ('BACKGROUND', (0, 1), (0, 1), risk_color),
+            ('TEXTCOLOR', (0, 1), (0, 1), TARAColors.WHITE if risk_level in ['Critical', 'High'] else TARAColors.BLACK),
         ]))
-        elements.append(impact_table)
+        elements.append(risk_table)
         elements.append(Spacer(1, 4))
         
-        # 风险评估和安全需求
+        # ========== 6. 安全需求 Security Requirement ==========
         security_req = result.get('security_requirement', '')
-        risk_data = [
-            ['安全需求', security_req[:100] + '...' if len(security_req) > 100 else security_req]
-        ]
-        
-        req_table = Table(risk_data, colWidths=[60, 420])
-        req_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (0, -1), TARAColors.LIGHT_BLUE),
-            ('FONTNAME', (0, 0), (-1, -1), CHINESE_FONT),
-            ('FONTSIZE', (0, 0), (-1, -1), 8),
-            ('GRID', (0, 0), (-1, -1), 0.5, TARAColors.GRAY),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('TOPPADDING', (0, 0), (-1, -1), 4),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-        ]))
-        elements.append(req_table)
+        if security_req:
+            elements.append(Paragraph('<b>6. 安全需求 Security Requirement</b>', styles['TARABody']))
+            req_data = [['安全需求', security_req]]
+            req_table = Table(req_data, colWidths=[60, 410])
+            req_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (0, -1), TARAColors.LIGHT_BLUE),
+                ('FONTNAME', (0, 0), (-1, -1), CHINESE_FONT),
+                ('FONTSIZE', (0, 0), (-1, -1), 8),
+                ('GRID', (0, 0), (-1, -1), 0.5, TARAColors.GRAY),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('TOPPADDING', (0, 0), (-1, -1), 4),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ]))
+            elements.append(req_table)
         
         elements.append(Spacer(1, 16))
         
-        # 每3条记录分页
-        if (idx + 1) % 3 == 0 and idx < len(results) - 1:
+        # 每2条记录分页（内容更多了）
+        if (idx + 1) % 2 == 0 and idx < len(results) - 1:
             elements.append(PageBreak())
     
     return elements
@@ -833,7 +1060,7 @@ def create_tara_results_page(data: Dict[str, Any], styles) -> List:
 
 # ==================== 风险汇总页 ====================
 def create_risk_summary_page(data: Dict[str, Any], styles) -> List:
-    """创建风险汇总页"""
+    """创建风险汇总页 - 包含自动计算的风险等级"""
     elements = []
     
     elements.append(create_section_header('风险评估汇总 Risk Assessment Summary', styles))
@@ -844,25 +1071,58 @@ def create_risk_summary_page(data: Dict[str, Any], styles) -> List:
         elements.append(Paragraph('无分析结果', styles['TARABody']))
         return elements
     
-    # 汇总表
-    summary_header = ['序号', '资产', 'STRIDE', '攻击向量', '安全影响', '操作影响', '安全需求']
+    # 汇总表 - 包含计算列
+    summary_header = ['序号', '资产', 'STRIDE', '攻击可行性', '影响等级', '风险等级', '风险处置', '安全需求']
     table_data = [summary_header]
     
+    # 风险统计
+    risk_stats = {'Critical': 0, 'High': 0, 'Medium': 0, 'Low': 0, 'QM': 0}
+    
     for idx, result in enumerate(results):
+        # 计算各项指标
+        attack_vector = result.get('attack_vector', '本地')
+        attack_complexity = result.get('attack_complexity', '低')
+        privileges_required = result.get('privileges_required', '低')
+        user_interaction = result.get('user_interaction', '不需要')
+        
+        av_value = calculate_attack_vector_value(attack_vector)
+        ac_value = calculate_attack_complexity_value(attack_complexity)
+        pr_value = calculate_privileges_value(privileges_required)
+        ui_value = calculate_user_interaction_value(user_interaction)
+        _, feasibility_level = calculate_attack_feasibility(av_value, ac_value, pr_value, ui_value)
+        
+        # 计算影响等级
+        safety_value = calculate_impact_value(result.get('safety_impact', '中等的'))
+        financial_value = calculate_impact_value(result.get('financial_impact', '中等的'))
+        operational_value = calculate_impact_value(result.get('operational_impact', '重大的'))
+        privacy_value = calculate_impact_value(result.get('privacy_impact', '可忽略不计的'))
+        impact_total = safety_value + financial_value + operational_value + privacy_value
+        impact_level = calculate_impact_level(impact_total)
+        
+        # 计算风险等级
+        risk_level = calculate_risk_level(impact_level, feasibility_level)
+        risk_treatment = get_risk_treatment(risk_level)
+        
+        # 统计
+        risk_stats[risk_level] = risk_stats.get(risk_level, 0) + 1
+        
         row = [
             str(idx + 1),
             result.get('asset_name', ''),
             result.get('stride_model', ''),
-            result.get('attack_vector', ''),
-            result.get('safety_impact', ''),
-            result.get('operational_impact', ''),
-            result.get('security_requirement', '')[:30] + '...' if len(result.get('security_requirement', '')) > 30 else result.get('security_requirement', '')
+            feasibility_level,
+            impact_level,
+            risk_level,
+            risk_treatment[:6] + '...' if len(risk_treatment) > 6 else risk_treatment,
+            result.get('security_requirement', '')[:20] + '...' if len(result.get('security_requirement', '')) > 20 else result.get('security_requirement', '')
         ]
         table_data.append(row)
     
-    col_widths = [30, 70, 50, 50, 60, 60, 160]
+    col_widths = [25, 60, 45, 50, 50, 45, 55, 130]
     summary_table = Table(table_data, colWidths=col_widths, repeatRows=1)
-    summary_table.setStyle(TableStyle([
+    
+    # 基础样式
+    table_style = [
         ('BACKGROUND', (0, 0), (-1, 0), TARAColors.DARK_BLUE),
         ('TEXTCOLOR', (0, 0), (-1, 0), TARAColors.WHITE),
         ('FONTNAME', (0, 0), (-1, 0), CHINESE_FONT_BOLD),
@@ -871,11 +1131,53 @@ def create_risk_summary_page(data: Dict[str, Any], styles) -> List:
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('GRID', (0, 0), (-1, -1), 0.5, TARAColors.GRAY),
-        ('TOPPADDING', (0, 0), (-1, -1), 4),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [TARAColors.WHITE, TARAColors.LIGHT_GRAY]),
-    ]))
+        ('TOPPADDING', (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+    ]
+    
+    # 为风险等级列添加颜色
+    for row_idx, row in enumerate(table_data[1:], start=1):
+        risk_level = row[5]
+        risk_color = get_risk_color(risk_level)
+        table_style.append(('BACKGROUND', (5, row_idx), (5, row_idx), risk_color))
+        if risk_level in ['Critical', 'High']:
+            table_style.append(('TEXTCOLOR', (5, row_idx), (5, row_idx), TARAColors.WHITE))
+    
+    summary_table.setStyle(TableStyle(table_style))
     elements.append(summary_table)
+    
+    # 风险统计汇总
+    elements.append(Spacer(1, 20))
+    elements.append(Paragraph('<b>风险统计 Risk Statistics</b>', styles['TARABody']))
+    elements.append(Spacer(1, 6))
+    
+    stats_data = [
+        ['风险等级', 'Critical', 'High', 'Medium', 'Low', 'QM', '合计'],
+        ['数量', str(risk_stats['Critical']), str(risk_stats['High']), 
+         str(risk_stats['Medium']), str(risk_stats['Low']), str(risk_stats['QM']),
+         str(sum(risk_stats.values()))]
+    ]
+    
+    stats_table = Table(stats_data, colWidths=[60, 60, 60, 60, 60, 60, 60])
+    stats_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), TARAColors.MEDIUM_BLUE),
+        ('TEXTCOLOR', (0, 0), (-1, 0), TARAColors.WHITE),
+        ('FONTNAME', (0, 0), (-1, -1), CHINESE_FONT),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('GRID', (0, 0), (-1, -1), 0.5, TARAColors.GRAY),
+        ('TOPPADDING', (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('BACKGROUND', (1, 1), (1, 1), TARAColors.RISK_CRITICAL),
+        ('TEXTCOLOR', (1, 1), (1, 1), TARAColors.WHITE),
+        ('BACKGROUND', (2, 1), (2, 1), TARAColors.RISK_HIGH),
+        ('TEXTCOLOR', (2, 1), (2, 1), TARAColors.WHITE),
+        ('BACKGROUND', (3, 1), (3, 1), TARAColors.RISK_MEDIUM),
+        ('BACKGROUND', (4, 1), (4, 1), TARAColors.RISK_LOW),
+        ('BACKGROUND', (5, 1), (5, 1), TARAColors.RISK_QM),
+    ]))
+    elements.append(stats_table)
     
     return elements
 
