@@ -1,226 +1,177 @@
-# TARA Report Generator API
+# TARA Backend Services
 
-威胁分析和风险评估(TARA)报告生成后端服务。
-
-## 功能特性
-
-- 🚀 基于FastAPI的高性能API服务
-- 📊 生成专业的TARA分析Excel报告
-- 📄 生成专业的TARA分析PDF报告（支持中文）
-- 🖼️ 支持图片上传（项目边界图、架构图等）
-- 📁 报告管理（列表、预览、下载、删除）
-- 🔄 支持JSON文件和JSON字符串两种输入方式
-
-## 中文字体配置
-
-PDF报告需要中文字体支持。系统会自动查找以下字体：
-
-### Linux
-```bash
-# Ubuntu/Debian
-sudo apt-get install fonts-wqy-zenhei fonts-wqy-microhei
-
-# CentOS/RHEL/Fedora
-sudo yum install wqy-zenhei-fonts wqy-microhei-fonts
-
-# 或安装 Noto CJK 字体
-sudo apt-get install fonts-noto-cjk
-```
-
-### Windows
-系统自带的微软雅黑、宋体、黑体等字体会自动被识别。
-
-### macOS
-系统自带的苹方、华文黑体等字体会自动被识别。
-
-### 手动安装字体
-如果系统字体不可用，可以将中文字体文件（.ttf/.ttc）放到以下目录：
-```
-backend/tara_api/fonts/
-```
-
-推荐的开源中文字体：
-- [文泉驿正黑](http://wenq.org/wqy2/index.cgi?ZenHei)
-- [思源黑体](https://github.com/adobe-fonts/source-han-sans)
-- [Noto Sans CJK](https://github.com/googlefonts/noto-cjk)
-
-## 快速开始
-
-### 安装依赖
-
-```bash
-# 使用pip安装
-pip install -e .
-
-# 或者使用pip安装依赖
-pip install fastapi uvicorn openpyxl pillow python-multipart pydantic aiofiles
-```
-
-### 启动服务
-
-```bash
-# 方式1: 使用命令行工具
-tara-api
-
-# 方式2: 使用uvicorn
-uvicorn tara_api.main:app --reload --host 0.0.0.0 --port 8000
-
-# 方式3: 直接运行
-python -m tara_api.main
-```
-
-### API文档
-
-启动服务后，访问以下地址查看API文档：
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
-
-## API端点
-
-### 图片上传
-```
-POST /api/images/upload
-```
-上传图片，支持类型：
-- `item_boundary`: 项目边界图
-- `system_architecture`: 系统架构图
-- `software_architecture`: 软件架构图
-- `dataflow`: 数据流图
-- `attack_tree`: 攻击树图
-
-### 生成报告
-```
-POST /api/reports/generate
-```
-参数：
-- `json_file`: JSON数据文件（可选）
-- `json_data`: JSON数据字符串（可选）
-- `item_boundary_image`: 项目边界图片ID
-- `system_architecture_image`: 系统架构图片ID
-- `software_architecture_image`: 软件架构图片ID
-- `dataflow_image`: 数据流图片ID
-- `attack_tree_images`: 攻击树图片ID列表（逗号分隔）
-
-### 获取报告列表
-```
-GET /api/reports
-```
-
-### 获取报告详情
-```
-GET /api/reports/{report_id}
-```
-
-### 下载报告
-```
-GET /api/reports/{report_id}/download
-```
-
-### 删除报告
-```
-DELETE /api/reports/{report_id}
-```
-
-## 输入数据格式
-
-```json
-{
-  "cover": {
-    "report_title": "威胁分析和风险评估报告",
-    "report_title_en": "Threat Analysis And Risk Assessment Report",
-    "project_name": "项目名称",
-    "data_level": "秘密",
-    "document_number": "文档编号",
-    "version": "V1.0",
-    "author_date": "2025.01",
-    "review_date": "2025.01"
-  },
-  "definitions": {
-    "title": "相关定义",
-    "functional_description": "功能描述...",
-    "assumptions": [
-      {"id": "ASM-01", "description": "假设描述"}
-    ],
-    "terminology": [
-      {"abbreviation": "IVI", "english": "In-Vehicle Infotainment", "chinese": "车载信息娱乐系统"}
-    ]
-  },
-  "assets": {
-    "title": "资产列表",
-    "assets": [
-      {
-        "id": "P001",
-        "name": "SOC",
-        "category": "内部实体",
-        "remarks": "备注",
-        "authenticity": true,
-        "availability": true
-      }
-    ]
-  },
-  "attack_trees": {
-    "title": "攻击树分析",
-    "attack_trees": [
-      {"title": "攻击树1", "image": ""}
-    ]
-  },
-  "tara_results": {
-    "title": "TARA分析结果",
-    "results": [
-      {
-        "asset_id": "P001",
-        "asset_name": "资产名称",
-        "category": "内部实体",
-        "security_attribute": "Authenticity",
-        "stride_model": "S欺骗",
-        "threat_scenario": "威胁场景描述",
-        "attack_path": "攻击路径描述",
-        "attack_vector": "本地",
-        "attack_complexity": "低",
-        "privileges_required": "低",
-        "user_interaction": "不需要",
-        "safety_impact": "中等的",
-        "financial_impact": "中等的",
-        "operational_impact": "重大的",
-        "privacy_impact": "可忽略不计的",
-        "security_requirement": "安全需求描述"
-      }
-    ]
-  }
-}
-```
+TARA (Threat Analysis and Risk Assessment) 后端服务，用于生成威胁分析和风险评估报告。
 
 ## 目录结构
 
 ```
 backend/
-├── pyproject.toml          # 项目配置
-├── README.md               # 说明文档
-├── tara_api/
-│   ├── __init__.py
-│   ├── main.py             # FastAPI应用
-│   ├── models.py           # Pydantic数据模型
-│   ├── tara_excel_generator.py  # Excel生成器
-│   ├── tara_pdf_generator.py    # PDF生成器（支持中文）
-│   └── fonts/              # 自定义字体目录（可选）
-├── uploads/                # 上传文件目录
-│   └── images/             # 图片存储
-└── reports/                # 生成的报告
+├── tara-data-service/          # 数据服务 - 数据上传、解析和存储
+│   ├── app/
+│   │   ├── api/                # API 模块
+│   │   │   ├── __init__.py
+│   │   │   └── v1/             # API v1 版本
+│   │   │       ├── __init__.py
+│   │   │       ├── router.py   # 路由聚合
+│   │   │       └── endpoints/  # 端点模块
+│   │   │           ├── __init__.py
+│   │   │           ├── health.py   # 健康检查
+│   │   │           ├── image.py    # 图片管理
+│   │   │           └── report.py   # 报告管理
+│   │   ├── common/             # 公共模块
+│   │   │   ├── __init__.py
+│   │   │   ├── database.py     # 数据库配置
+│   │   │   ├── minio_client.py # MinIO 客户端
+│   │   │   └── models.py       # 数据库模型
+│   │   ├── config.py           # 配置模块
+│   │   ├── __init__.py
+│   │   ├── main.py             # FastAPI 入口
+│   │   ├── repositories/       # 数据仓库层
+│   │   │   ├── __init__.py
+│   │   │   └── report.py
+│   │   └── services/           # 业务逻辑层
+│   │       ├── __init__.py
+│   │       └── data.py
+│   ├── Dockerfile
+│   └── pyproject.toml
+│
+├── tara-report-service/        # 报告服务 - 报告生成和下载
+│   ├── app/
+│   │   ├── api/                # API 模块
+│   │   │   ├── __init__.py
+│   │   │   └── v1/             # API v1 版本
+│   │   │       ├── __init__.py
+│   │   │       ├── router.py   # 路由聚合
+│   │   │       └── endpoints/  # 端点模块
+│   │   │           ├── __init__.py
+│   │   │           ├── health.py   # 健康检查
+│   │   │           └── report.py   # 报告生成
+│   │   ├── common/             # 公共模块
+│   │   │   ├── __init__.py
+│   │   │   ├── database.py
+│   │   │   ├── minio_client.py
+│   │   │   └── models.py
+│   │   ├── config.py           # 配置模块
+│   │   ├── generators/         # 报告生成器
+│   │   │   ├── __init__.py
+│   │   │   ├── excel.py        # Excel 报告生成器
+│   │   │   └── pdf.py          # PDF 报告生成器
+│   │   ├── __init__.py
+│   │   ├── main.py             # FastAPI 入口
+│   │   ├── repositories/       # 数据仓库层
+│   │   │   ├── __init__.py
+│   │   │   └── report.py
+│   │   └── services/           # 业务逻辑层
+│   │       ├── __init__.py
+│   │       └── report.py
+│   ├── Dockerfile
+│   └── pyproject.toml
+│
+└── README.md
 ```
 
-## 开发
+## 服务说明
+
+### tara-data-service (数据服务)
+
+负责数据的上传、解析和存储。
+
+**主要功能：**
+- 上传 JSON 数据和图片
+- 解析并存储到 MySQL 数据库
+- 图片存储到 MinIO
+- 提供报告数据查询 API
+
+**端口：** 8001
+
+**主要 API (v1)：**
+- `POST /api/v1/upload/batch` - 批量上传 JSON 和图片
+- `POST /api/v1/images/upload` - 上传图片
+- `GET /api/v1/images/{image_id}` - 获取图片
+- `GET /api/v1/reports` - 获取报告列表
+- `GET /api/v1/reports/{report_id}` - 获取报告详情
+- `GET /api/v1/reports/{report_id}/cover` - 获取封面信息
+- `GET /api/v1/reports/{report_id}/definitions` - 获取相关定义
+- `GET /api/v1/reports/{report_id}/assets` - 获取资产列表
+- `GET /api/v1/reports/{report_id}/attack-trees` - 获取攻击树
+- `GET /api/v1/reports/{report_id}/tara-results` - 获取 TARA 分析结果
+- `DELETE /api/v1/reports/{report_id}` - 删除报告
+- `GET /api/v1/health` - 健康检查
+
+### tara-report-service (报告服务)
+
+负责报告的生成和下载。
+
+**主要功能：**
+- 生成 Excel 报告
+- 生成 PDF 报告
+- 提供报告下载
+
+**端口：** 8002
+
+**主要 API (v1)：**
+- `POST /api/v1/reports/{report_id}/generate` - 生成报告 (支持 xlsx/pdf 格式)
+- `GET /api/v1/reports/{report_id}/download` - 下载报告
+- `GET /api/v1/reports/{report_id}/download/{format}` - 下载指定格式报告
+- `GET /api/v1/reports/{report_id}/preview` - 获取报告预览数据
+- `GET /api/v1/reports/{report_id}/status` - 获取报告状态
+- `GET /api/v1/health` - 健康检查
+
+## 运行方式
+
+### 使用 Docker Compose（推荐）
 
 ```bash
-# 安装开发依赖
-pip install -e ".[dev]"
-
-# 运行测试
-pytest
-
-# 代码格式化
-black tara_api/
+# 在项目根目录下
+docker-compose up -d
 ```
 
-## License
+### 本地开发
 
-MIT License
+```bash
+# 数据服务
+cd tara-data-service
+pip install -e .
+uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
+
+# 报告服务
+cd tara-report-service
+pip install -e .
+uvicorn app.main:app --host 0.0.0.0 --port 8002 --reload
+```
+
+## 环境变量
+
+### 通用配置
+
+| 变量名 | 说明 | 默认值 |
+|--------|------|--------|
+| MYSQL_HOST | MySQL 主机 | mysql |
+| MYSQL_PORT | MySQL 端口 | 3306 |
+| MYSQL_USER | MySQL 用户名 | tara |
+| MYSQL_PASSWORD | MySQL 密码 | tara123456 |
+| MYSQL_DATABASE | MySQL 数据库名 | tara_db |
+| MINIO_ENDPOINT | MinIO 端点 | minio:9000 |
+| MINIO_ACCESS_KEY | MinIO 访问密钥 | minioadmin |
+| MINIO_SECRET_KEY | MinIO 秘密密钥 | minioadmin123 |
+| MINIO_SECURE | 是否使用 HTTPS | false |
+
+### 数据服务配置
+
+| 变量名 | 说明 | 默认值 |
+|--------|------|--------|
+| REPORT_SERVICE_URL | 报告服务地址 | http://report-service:8002 |
+
+### 报告服务配置
+
+| 变量名 | 说明 | 默认值 |
+|--------|------|--------|
+| DATA_SERVICE_URL | 数据服务地址 | http://data-service:8001 |
+
+## 技术栈
+
+- **Web 框架**: FastAPI
+- **ORM**: SQLAlchemy
+- **数据库**: MySQL 8.0
+- **对象存储**: MinIO
+- **报告生成**: openpyxl (Excel), reportlab (PDF)

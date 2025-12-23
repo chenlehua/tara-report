@@ -54,7 +54,7 @@ services:
   data-service:
     build:
       context: ./backend
-      dockerfile: data-service/Dockerfile
+      dockerfile: tara-data-service/Dockerfile
     container_name: tara-data-service
     restart: unless-stopped
     ports:
@@ -77,7 +77,7 @@ services:
       minio:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8001/api/v1/health"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -89,7 +89,7 @@ services:
   report-service:
     build:
       context: ./backend
-      dockerfile: report-service/Dockerfile
+      dockerfile: tara-report-service/Dockerfile
     container_name: tara-report-service
     restart: unless-stopped
     ports:
@@ -114,7 +114,7 @@ services:
       minio:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8002/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8002/api/v1/health"]
       interval: 10s
       timeout: 5s
       retries: 5
