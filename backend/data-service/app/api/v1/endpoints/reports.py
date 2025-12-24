@@ -24,6 +24,99 @@ from app.common.constants.enums import ALLOWED_IMAGE_EXTENSIONS
 router = APIRouter()
 
 
+@router.get("/reports")
+async def list_reports(
+    page: int = 1,
+    page_size: int = 20,
+    db: Session = Depends(get_db)
+):
+    """
+    获取报告列表
+    
+    Args:
+        page: 页码
+        page_size: 每页数量
+    """
+    offset = (page - 1) * page_size
+    
+    # 查询总数
+    total = db.query(Report).count()
+    
+    # 查询报告列表
+    reports = db.query(Report).order_by(Report.created_at.desc()).offset(offset).limit(page_size).all()
+    
+    result = []
+    for report in reports:
+        # 获取封面信息
+        cover = db.query(ReportCover).filter(ReportCover.report_id == report.report_id).first()
+        
+        # 统计信息
+        assets_count = db.query(ReportAsset).filter(ReportAsset.report_id == report.report_id).count()
+        tara_count = db.query(ReportTARAResult).filter(ReportTARAResult.report_id == report.report_id).count()
+        attack_trees_count = db.query(ReportAttackTree).filter(ReportAttackTree.report_id == report.report_id).count()
+        
+        # 统计高风险项
+        high_risk_count = db.query(ReportTARAResult).filter(
+            ReportTARAResult.report_id == report.report_id,
+            ReportTARAResult.operational_impact.in_(['重大的', '严重的'])
+        ).count()
+        
+        result.append({
+            "id": report.report_id,
+            "report_id": report.report_id,
+            "name": cover.report_title if cover else "TARA报告",
+            "project_name": cover.project_name if cover else "",
+            "report_title": cover.report_title if cover else "",
+            "status": report.status,
+            "created_at": report.created_at.isoformat() if report.created_at else "",
+            "file_path": "",
+            "statistics": {
+                "assets_count": assets_count,
+                "threats_count": tara_count,
+                "high_risk_count": high_risk_count,
+                "measures_count": tara_count,
+                "attack_trees_count": attack_trees_count
+            },
+            "downloads": {}  # 由 report-service 补充
+        })
+    
+    return {
+        "success": True,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "reports": result
+    }
+
+
+@router.delete("/reports/{report_id}")
+async def delete_report(report_id: str, db: Session = Depends(get_db)):
+    """
+    删除报告及其所有关联资源
+    
+    Args:
+        report_id: 报告ID
+    """
+    report = db.query(Report).filter(Report.report_id == report_id).first()
+    if not report:
+        raise HTTPException(status_code=404, detail="报告不存在")
+    
+    # 删除 MinIO 中的图片
+    minio = get_minio_client()
+    images = db.query(ReportImage).filter(ReportImage.report_id == report_id).all()
+    for image in images:
+        try:
+            minio.delete_file(image.minio_bucket, image.minio_path)
+        except:
+            pass
+    
+    # 删除数据库记录（级联删除）
+    db.delete(report)
+    db.commit()
+    
+    return {"success": True, "message": "报告已删除"}
+
+
 def generate_report_id() -> str:
     """Generate report ID"""
     return f"RPT-{datetime.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:8].upper()}"

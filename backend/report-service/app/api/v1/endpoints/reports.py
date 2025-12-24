@@ -1,12 +1,16 @@
 """
 Report management endpoints
+报告管理接口
+
+报告列表和详情数据从 data-service 获取
+生成的报告文件信息存储在 report-service 自己的数据库表中
 """
 import io
 import os
 import tempfile
 import httpx
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from pathlib import Path
 from urllib.parse import quote
 
@@ -17,8 +21,7 @@ from sqlalchemy.orm import Session
 from app.common.database import get_db, get_minio_client
 from app.common.config.settings import settings
 from app.common.models import (
-    Report, ReportCover, GeneratedReport, ReportAsset,
-    ReportTARAResult, ReportAttackTree, ReportDefinitions, ReportImage
+    RSReport, RSReportCover, RSGeneratedFile, RSReportStatistics
 )
 from app.generators import generate_tara_excel_from_json, generate_tara_pdf_from_json
 
@@ -27,9 +30,32 @@ router = APIRouter()
 
 # ==================== Helper functions ====================
 
+async def fetch_report_list_from_data_service(page: int = 1, page_size: int = 20) -> Dict[str, Any]:
+    """
+    从 data-service 获取报告列表
+    """
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        try:
+            # 获取报告列表（通过查询 data-service 的数据库）
+            # 由于 data-service 没有专门的列表接口，我们需要获取所有报告的基本信息
+            # 这里我们假设 data-service 有一个列表接口，如果没有则需要添加
+            resp = await client.get(
+                f"{settings.DATA_SERVICE_URL}/api/v1/reports",
+                params={"page": page, "page_size": page_size}
+            )
+            if resp.status_code == 200:
+                return resp.json()
+            else:
+                return {"success": True, "total": 0, "page": page, "page_size": page_size, "reports": []}
+        except Exception as e:
+            print(f"Failed to fetch report list from data service: {e}")
+            return {"success": True, "total": 0, "page": page, "page_size": page_size, "reports": []}
+
+
 async def fetch_data_from_service(report_id: str) -> Dict[str, Any]:
     """
     Fetch report data from data service
+    从 data-service 获取报告完整数据
     """
     async with httpx.AsyncClient(timeout=30.0) as client:
         # Get cover data
@@ -69,6 +95,20 @@ async def fetch_data_from_service(report_id: str) -> Dict[str, Any]:
         "attack_trees": attack_trees_data,
         "tara_results": tara_data
     }
+
+
+async def fetch_report_basic_info(report_id: str) -> Optional[Dict[str, Any]]:
+    """
+    从 data-service 获取报告基本信息
+    """
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        try:
+            cover_resp = await client.get(f"{settings.DATA_SERVICE_URL}/api/v1/reports/{report_id}/cover")
+            if cover_resp.status_code == 200:
+                return cover_resp.json()
+        except Exception as e:
+            print(f"Failed to fetch report basic info: {e}")
+    return None
 
 
 async def download_image_from_minio(minio_path: str, report_id: str) -> Optional[str]:
@@ -168,6 +208,24 @@ def cleanup_temp_files(data: Dict[str, Any]):
             pass
 
 
+def get_generated_files_info(report_id: str, db: Session) -> Dict[str, Any]:
+    """
+    获取报告已生成的文件信息
+    """
+    generated_files = db.query(RSGeneratedFile).filter(
+        RSGeneratedFile.report_id == report_id
+    ).all()
+    
+    downloads = {}
+    for gf in generated_files:
+        downloads[gf.file_type] = {
+            "url": f"/api/v1/reports/{report_id}/download?format={gf.file_type}",
+            "file_size": gf.file_size,
+            "generated_at": gf.generated_at.isoformat() if gf.generated_at else None
+        }
+    return downloads
+
+
 # ==================== API endpoints ====================
 
 @router.get("/reports")
@@ -177,103 +235,51 @@ async def list_reports(
     db: Session = Depends(get_db)
 ):
     """
-    Get report list
+    获取报告列表
     
-    Args:
-        page: Page number
-        page_size: Page size
+    从 data-service 获取报告数据，并补充本地的生成文件信息
     """
-    offset = (page - 1) * page_size
+    # 从 data-service 获取报告列表
+    data_service_result = await fetch_report_list_from_data_service(page, page_size)
     
-    total = db.query(Report).count()
-    reports = db.query(Report).order_by(Report.created_at.desc()).offset(offset).limit(page_size).all()
-    
-    result = []
+    # 如果 data-service 返回了数据，补充生成文件信息
+    reports = data_service_result.get("reports", [])
     for report in reports:
-        cover = db.query(ReportCover).filter(ReportCover.report_id == report.report_id).first()
-        
-        # Statistics
-        assets_count = db.query(ReportAsset).filter(ReportAsset.report_id == report.report_id).count()
-        tara_count = db.query(ReportTARAResult).filter(ReportTARAResult.report_id == report.report_id).count()
-        attack_trees_count = db.query(ReportAttackTree).filter(ReportAttackTree.report_id == report.report_id).count()
-        
-        # Count high risk items
-        high_risk_count = db.query(ReportTARAResult).filter(
-            ReportTARAResult.report_id == report.report_id,
-            ReportTARAResult.operational_impact.in_(['重大的', '严重的'])
-        ).count()
-        
-        # Get generated file info
-        generated_files = db.query(GeneratedReport).filter(
-            GeneratedReport.report_id == report.report_id
-        ).all()
-        
-        downloads = {}
-        for gf in generated_files:
-            downloads[gf.file_type] = {
-                "url": f"/api/v1/reports/{report.report_id}/download?format={gf.file_type}",
-                "file_size": gf.file_size,
-                "generated_at": gf.generated_at.isoformat() if gf.generated_at else None
-            }
-        
-        result.append({
-            "id": report.report_id,
-            "report_id": report.report_id,
-            "name": cover.report_title if cover else "TARA报告",
-            "project_name": cover.project_name if cover else "",
-            "report_title": cover.report_title if cover else "",
-            "status": report.status,
-            "created_at": report.created_at.isoformat(),
-            "file_path": "",
-            "statistics": {
-                "assets_count": assets_count,
-                "threats_count": tara_count,
-                "high_risk_count": high_risk_count,
-                "measures_count": tara_count,
-                "attack_trees_count": attack_trees_count
-            },
-            "downloads": downloads
-        })
+        report_id = report.get("report_id")
+        if report_id:
+            # 获取本地存储的生成文件信息
+            downloads = get_generated_files_info(report_id, db)
+            report["downloads"] = downloads
     
     return {
         "success": True,
-        "total": total,
+        "total": data_service_result.get("total", 0),
         "page": page,
         "page_size": page_size,
-        "reports": result
+        "reports": reports
     }
 
 
 @router.get("/reports/{report_id}")
 async def get_report_info(report_id: str, db: Session = Depends(get_db)):
     """
-    Get complete report information (for preview)
+    获取报告完整信息（用于预览）
     
-    Args:
-        report_id: Report ID
+    从 data-service 获取报告数据
     """
-    report = db.query(Report).filter(Report.report_id == report_id).first()
-    if not report:
-        raise HTTPException(status_code=404, detail="报告不存在")
+    # 从 data-service 获取报告数据
+    try:
+        data = await fetch_data_from_service(report_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取报告数据失败: {str(e)}")
     
-    # Get cover info
-    cover = db.query(ReportCover).filter(ReportCover.report_id == report_id).first()
-    
-    # Get definitions
-    definitions = db.query(ReportDefinitions).filter(ReportDefinitions.report_id == report_id).first()
-    
-    # Get assets
-    assets = db.query(ReportAsset).filter(ReportAsset.report_id == report_id).all()
-    
-    # Get attack trees
-    attack_trees = db.query(ReportAttackTree).filter(
-        ReportAttackTree.report_id == report_id
-    ).order_by(ReportAttackTree.sort_order).all()
-    
-    # Get TARA results
-    tara_results = db.query(ReportTARAResult).filter(
-        ReportTARAResult.report_id == report_id
-    ).order_by(ReportTARAResult.sort_order).all()
+    cover_data = data.get('cover', {})
+    definitions_data = data.get('definitions', {})
+    assets_data = data.get('assets', {})
+    attack_trees_data = data.get('attack_trees', {})
+    tara_results_data = data.get('tara_results', {})
     
     # Build image URL
     def build_image_url(minio_path):
@@ -281,62 +287,19 @@ async def get_report_info(report_id: str, db: Session = Depends(get_db)):
             return None
         return f"/api/v1/reports/{report_id}/image-by-path?path={minio_path}"
     
-    # Build assets list
-    assets_list = [
-        {
-            "id": asset.asset_id,
-            "name": asset.name,
-            "category": asset.category,
-            "remarks": asset.remarks,
-            "authenticity": asset.authenticity,
-            "integrity": asset.integrity,
-            "non_repudiation": asset.non_repudiation,
-            "confidentiality": asset.confidentiality,
-            "availability": asset.availability,
-            "authorization": asset.authorization
-        }
-        for asset in assets
-    ]
+    # Process assets
+    assets_list = assets_data.get('assets', [])
     
-    # Build attack trees list
-    attack_trees_list = [
-        {
-            "asset_id": tree.asset_id,
-            "asset_name": tree.asset_name,
-            "title": tree.title,
-            "image": tree.image,
-            "image_url": build_image_url(tree.image)
-        }
-        for tree in attack_trees
-    ]
+    # Process attack trees, add image_url
+    attack_trees_list = []
+    for tree in attack_trees_data.get('attack_trees', []):
+        tree_copy = dict(tree)
+        if tree.get('image'):
+            tree_copy['image_url'] = build_image_url(tree['image'])
+        attack_trees_list.append(tree_copy)
     
-    # Build TARA results list
-    tara_results_list = [
-        {
-            "asset_id": r.asset_id,
-            "asset_name": r.asset_name,
-            "subdomain1": r.subdomain1,
-            "subdomain2": r.subdomain2,
-            "subdomain3": r.subdomain3,
-            "category": r.category,
-            "security_attribute": r.security_attribute,
-            "stride_model": r.stride_model,
-            "threat_scenario": r.threat_scenario,
-            "attack_path": r.attack_path,
-            "wp29_mapping": r.wp29_mapping,
-            "attack_vector": r.attack_vector,
-            "attack_complexity": r.attack_complexity,
-            "privileges_required": r.privileges_required,
-            "user_interaction": r.user_interaction,
-            "safety_impact": r.safety_impact,
-            "financial_impact": r.financial_impact,
-            "operational_impact": r.operational_impact,
-            "privacy_impact": r.privacy_impact,
-            "security_goal": r.security_goal,
-            "security_requirement": r.security_requirement
-        }
-        for r in tara_results
-    ]
+    # Process TARA results
+    tara_results_list = tara_results_data.get('results', [])
     
     # Statistics
     statistics = {
@@ -347,63 +310,39 @@ async def get_report_info(report_id: str, db: Session = Depends(get_db)):
         'attack_trees_count': len(attack_trees_list)
     }
     
-    # Get generated file info
-    generated_files = db.query(GeneratedReport).filter(
-        GeneratedReport.report_id == report_id
-    ).all()
-    
-    downloads = {}
-    for gf in generated_files:
-        downloads[gf.file_type] = {
-            "url": f"/api/v1/reports/{report_id}/download?format={gf.file_type}",
-            "file_size": gf.file_size,
-            "generated_at": gf.generated_at.isoformat() if gf.generated_at else None
-        }
+    # 获取本地存储的生成文件信息
+    downloads = get_generated_files_info(report_id, db)
     
     # Return format consistent with before refactoring
     return {
-        "id": report.report_id,
-        "report_id": report.report_id,
-        "name": cover.report_title if cover else "TARA报告",
-        "project_name": cover.project_name if cover else "",
-        "status": report.status,
-        "created_at": report.created_at.isoformat(),
-        "updated_at": report.updated_at.isoformat() if report.updated_at else None,
+        "id": report_id,
+        "report_id": report_id,
+        "name": cover_data.get('report_title', 'TARA报告'),
+        "project_name": cover_data.get('project_name', ''),
+        "status": "completed",
+        "created_at": datetime.now().isoformat(),
+        "updated_at": None,
         "file_path": "",
         "statistics": statistics,
         "downloads": downloads,
-        "cover": {
-            "report_title": cover.report_title if cover else "",
-            "report_title_en": cover.report_title_en if cover else "",
-            "project_name": cover.project_name if cover else "",
-            "data_level": cover.data_level if cover else "",
-            "document_number": cover.document_number if cover else "",
-            "version": cover.version if cover else "",
-            "author_date": cover.author_date if cover else "",
-            "review_date": cover.review_date if cover else "",
-            "sign_date": cover.sign_date if cover else "",
-            "approve_date": cover.approve_date if cover else ""
-        } if cover else {},
+        "cover": cover_data,
         "definitions": {
-            "title": definitions.title if definitions else "",
-            "functional_description": definitions.functional_description if definitions else "",
-            "item_boundary_image": build_image_url(definitions.item_boundary_image) if definitions else None,
-            "system_architecture_image": build_image_url(definitions.system_architecture_image) if definitions else None,
-            "software_architecture_image": build_image_url(definitions.software_architecture_image) if definitions else None,
-            "assumptions": definitions.assumptions if definitions else [],
-            "terminology": definitions.terminology if definitions else []
-        } if definitions else {},
+            **definitions_data,
+            'item_boundary_image': build_image_url(definitions_data.get('item_boundary_image')),
+            'system_architecture_image': build_image_url(definitions_data.get('system_architecture_image')),
+            'software_architecture_image': build_image_url(definitions_data.get('software_architecture_image'))
+        },
         "assets": {
-            "title": "资产列表",
+            "title": assets_data.get('title', '资产列表'),
             "assets": assets_list,
-            "dataflow_image": build_image_url(definitions.dataflow_image) if definitions and definitions.dataflow_image else None
+            "dataflow_image": build_image_url(assets_data.get('dataflow_image'))
         },
         "attack_trees": {
-            "title": "攻击树分析",
+            "title": attack_trees_data.get('title', '攻击树分析'),
             "attack_trees": attack_trees_list
         },
         "tara_results": {
-            "title": "TARA分析结果",
+            "title": tara_results_data.get('title', 'TARA分析结果'),
             "results": tara_results_list
         }
     }
@@ -412,34 +351,37 @@ async def get_report_info(report_id: str, db: Session = Depends(get_db)):
 @router.delete("/reports/{report_id}")
 async def delete_report(report_id: str, db: Session = Depends(get_db)):
     """
-    Delete report and all related resources
+    删除报告及其所有关联资源
     
-    Args:
-        report_id: Report ID
+    通过调用 data-service 的删除接口删除报告数据
+    同时删除本地存储的生成文件信息
     """
-    report = db.query(Report).filter(Report.report_id == report_id).first()
-    if not report:
-        raise HTTPException(status_code=404, detail="报告不存在")
-    
-    # Delete images from MinIO
-    minio = get_minio_client()
-    images = db.query(ReportImage).filter(ReportImage.report_id == report_id).all()
-    for image in images:
+    # 调用 data-service 删除报告
+    async with httpx.AsyncClient(timeout=30.0) as client:
         try:
-            minio.delete_file(image.minio_bucket, image.minio_path)
-        except:
-            pass
+            resp = await client.delete(f"{settings.DATA_SERVICE_URL}/api/v1/reports/{report_id}")
+            if resp.status_code == 404:
+                raise HTTPException(status_code=404, detail="报告不存在")
+            elif resp.status_code != 200:
+                raise HTTPException(status_code=500, detail="删除报告失败")
+        except httpx.RequestError as e:
+            raise HTTPException(status_code=500, detail=f"无法连接到数据服务: {str(e)}")
     
-    # Delete generated report files from MinIO
-    generated_files = db.query(GeneratedReport).filter(GeneratedReport.report_id == report_id).all()
+    # 删除本地存储的生成文件
+    minio = get_minio_client()
+    generated_files = db.query(RSGeneratedFile).filter(RSGeneratedFile.report_id == report_id).all()
     for gf in generated_files:
         try:
             minio.delete_file(gf.minio_bucket, gf.minio_path)
         except:
             pass
+        db.delete(gf)
     
-    # Delete database records (cascade delete)
-    db.delete(report)
+    # 删除本地报告记录（如果有）
+    local_report = db.query(RSReport).filter(RSReport.report_id == report_id).first()
+    if local_report:
+        db.delete(local_report)
+    
     db.commit()
     
     return {"success": True, "message": "报告已删除"}
@@ -453,20 +395,16 @@ async def generate_report(
     db: Session = Depends(get_db)
 ):
     """
-    Generate report
+    生成报告
     
-    Args:
-        report_id: Report ID
-        format: Report format (xlsx or pdf)
+    从 data-service 获取数据，生成报告文件后上传到 MinIO
+    生成文件信息存储到本地数据库
     """
-    # Check if report exists
-    report = db.query(Report).filter(Report.report_id == report_id).first()
-    if not report:
-        raise HTTPException(status_code=404, detail="报告不存在")
-    
-    # Prepare data
+    # Prepare data from data-service
     try:
         data = await prepare_report_data(report_id)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取报告数据失败: {str(e)}")
     
@@ -497,20 +435,41 @@ async def generate_report(
         
         minio.upload_bytes(settings.BUCKET_REPORTS, object_name, file_content, content_type)
         
+        # 确保本地有报告记录（用于关联生成文件）
+        local_report = db.query(RSReport).filter(RSReport.report_id == report_id).first()
+        if not local_report:
+            cover_data = data.get('cover', {})
+            local_report = RSReport(
+                report_id=report_id,
+                project_name=cover_data.get('project_name', ''),
+                report_title=cover_data.get('report_title', 'TARA报告'),
+                report_title_en=cover_data.get('report_title_en', ''),
+                status='completed',
+                source_type='sync'
+            )
+            db.add(local_report)
+            db.flush()
+        
         # Record to database
-        existing = db.query(GeneratedReport).filter(
-            GeneratedReport.report_id == report_id,
-            GeneratedReport.file_type == format.lower()
+        existing = db.query(RSGeneratedFile).filter(
+            RSGeneratedFile.report_id == report_id,
+            RSGeneratedFile.file_type == format.lower()
         ).first()
+        
+        cover_data = data.get('cover', {})
+        project_name = cover_data.get('project_name', 'TARA报告')
+        file_name = f"{project_name}_{report_id}{suffix}"
         
         if existing:
             existing.minio_path = object_name
             existing.file_size = len(file_content)
+            existing.file_name = file_name
             existing.generated_at = datetime.now()
         else:
-            generated = GeneratedReport(
+            generated = RSGeneratedFile(
                 report_id=report_id,
                 file_type=format.lower(),
+                file_name=file_name,
                 minio_path=object_name,
                 minio_bucket=settings.BUCKET_REPORTS,
                 file_size=len(file_content)
@@ -522,10 +481,6 @@ async def generate_report(
         # Clean up temporary image files
         cleanup_temp_files(data)
         
-        # Get project name for filename
-        cover = db.query(ReportCover).filter(ReportCover.report_id == report_id).first()
-        project_name = cover.project_name if cover else "TARA报告"
-        
         return {
             "success": True,
             "message": "报告生成成功",
@@ -533,7 +488,7 @@ async def generate_report(
             "format": format.lower(),
             "file_size": len(file_content),
             "download_url": f"/api/v1/reports/{report_id}/download?format={format.lower()}",
-            "file_name": f"{project_name}_{report_id}{suffix}"
+            "file_name": file_name
         }
         
     except Exception as e:
@@ -550,15 +505,11 @@ async def generate_report(
 async def _do_download_report(report_id: str, format: str, db: Session):
     """
     Internal download report logic
-    
-    Args:
-        report_id: Report ID
-        format: Report format (xlsx or pdf)
     """
     # Find generated report
-    generated = db.query(GeneratedReport).filter(
-        GeneratedReport.report_id == report_id,
-        GeneratedReport.file_type == format.lower()
+    generated = db.query(RSGeneratedFile).filter(
+        RSGeneratedFile.report_id == report_id,
+        RSGeneratedFile.file_type == format.lower()
     ).first()
     
     if not generated:
@@ -571,13 +522,16 @@ async def _do_download_report(report_id: str, format: str, db: Session):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"下载报告失败: {str(e)}")
     
-    # Get project name for filename
-    cover = db.query(ReportCover).filter(ReportCover.report_id == report_id).first()
-    project_name = cover.project_name if cover else "TARA报告"
+    # Get filename
+    filename = generated.file_name
+    if not filename:
+        # Fallback to getting from data-service
+        cover_data = await fetch_report_basic_info(report_id)
+        project_name = cover_data.get('project_name', 'TARA报告') if cover_data else 'TARA报告'
+        suffix = ".pdf" if format.lower() == "pdf" else ".xlsx"
+        filename = f"{project_name}_{report_id}{suffix}"
     
-    suffix = ".pdf" if format.lower() == "pdf" else ".xlsx"
     content_type = "application/pdf" if format.lower() == "pdf" else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    filename = f"{project_name}_{report_id}{suffix}"
     
     # URL encode filename for Chinese characters
     encoded_filename = quote(filename, safe='')
@@ -598,11 +552,7 @@ async def download_report_with_format(
     db: Session = Depends(get_db)
 ):
     """
-    Download report (format as path parameter)
-    
-    Args:
-        report_id: Report ID
-        format: Report format (xlsx or pdf)
+    下载报告（格式作为路径参数）
     """
     return await _do_download_report(report_id, format, db)
 
@@ -614,11 +564,7 @@ async def download_report(
     db: Session = Depends(get_db)
 ):
     """
-    Download report (format as query parameter)
-    
-    Args:
-        report_id: Report ID
-        format: Report format (xlsx or pdf)
+    下载报告（格式作为查询参数）
     """
     return await _do_download_report(report_id, format, db)
 
@@ -626,32 +572,21 @@ async def download_report(
 @router.get("/reports/{report_id}/preview")
 async def preview_report(report_id: str, db: Session = Depends(get_db)):
     """
-    Get report preview data
+    获取报告预览数据
     """
     # Get data from data service
     try:
         data = await fetch_data_from_service(report_id)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取报告数据失败: {str(e)}")
     
-    # Get generated file info
-    generated_files = db.query(GeneratedReport).filter(
-        GeneratedReport.report_id == report_id
-    ).all()
-    
-    downloads = {}
-    for gf in generated_files:
-        downloads[gf.file_type] = {
-            "url": f"/api/v1/reports/{report_id}/download?format={gf.file_type}",
-            "file_size": gf.file_size,
-            "generated_at": gf.generated_at.isoformat() if gf.generated_at else None
-        }
-    
-    # Get report basic info
-    report = db.query(Report).filter(Report.report_id == report_id).first()
-    cover = db.query(ReportCover).filter(ReportCover.report_id == report_id).first()
+    # 获取本地存储的生成文件信息
+    downloads = get_generated_files_info(report_id, db)
     
     # Parse data to expected format
+    cover_data = data.get('cover', {})
     definitions_data = data.get('definitions', {})
     assets_data = data.get('assets', {})
     attack_trees_data = data.get('attack_trees', {})
@@ -687,23 +622,23 @@ async def preview_report(report_id: str, db: Session = Depends(get_db)):
     preview_data = {
         'id': report_id,
         'report_id': report_id,
-        'name': cover.report_title if cover else 'TARA报告',
-        'project_name': cover.project_name if cover else '',
-        'status': report.status if report else 'completed',
-        'created_at': report.created_at.isoformat() if report else '',
+        'name': cover_data.get('report_title', 'TARA报告'),
+        'project_name': cover_data.get('project_name', ''),
+        'status': 'completed',
+        'created_at': datetime.now().isoformat(),
         'file_path': '',
         'statistics': statistics,
         'report_info': {
             'id': report_id,
-            'name': cover.report_title if cover else 'TARA报告',
-            'project_name': cover.project_name if cover else '',
-            'version': cover.version if cover else '1.0',
-            'created_at': report.created_at.isoformat() if report else '',
+            'name': cover_data.get('report_title', 'TARA报告'),
+            'project_name': cover_data.get('project_name', ''),
+            'version': cover_data.get('version', '1.0'),
+            'created_at': datetime.now().isoformat(),
             'file_path': '',
             'file_size': 0,
             'statistics': statistics
         },
-        'cover': data.get('cover', {}),
+        'cover': cover_data,
         'definitions': {
             **definitions_data,
             'item_boundary_image': build_image_url(definitions_data.get('item_boundary_image')),
@@ -711,16 +646,16 @@ async def preview_report(report_id: str, db: Session = Depends(get_db)):
             'software_architecture_image': build_image_url(definitions_data.get('software_architecture_image'))
         },
         'assets': {
-            'title': '资产列表',
+            'title': assets_data.get('title', '资产列表'),
             'assets': assets_list,
             'dataflow_image': build_image_url(assets_data.get('dataflow_image'))
         },
         'attack_trees': {
-            'title': '攻击树分析',
+            'title': attack_trees_data.get('title', '攻击树分析'),
             'attack_trees': attack_trees
         },
         'tara_results': {
-            'title': 'TARA分析结果',
+            'title': tara_results_data.get('title', 'TARA分析结果'),
             'results': tara_results_list
         },
         'downloads': downloads
@@ -732,21 +667,22 @@ async def preview_report(report_id: str, db: Session = Depends(get_db)):
 @router.get("/reports/{report_id}/status")
 async def get_report_status(report_id: str, db: Session = Depends(get_db)):
     """
-    Get report status
+    获取报告状态
     """
-    report = db.query(Report).filter(Report.report_id == report_id).first()
-    if not report:
+    # 先尝试从 data-service 获取基本信息
+    cover_data = await fetch_report_basic_info(report_id)
+    if not cover_data:
         raise HTTPException(status_code=404, detail="报告不存在")
     
-    # Get generated files
-    generated_files = db.query(GeneratedReport).filter(
-        GeneratedReport.report_id == report_id
+    # 获取生成文件信息
+    generated_files = db.query(RSGeneratedFile).filter(
+        RSGeneratedFile.report_id == report_id
     ).all()
     
     return {
         "report_id": report_id,
-        "status": report.status,
-        "created_at": report.created_at.isoformat(),
+        "status": "completed",
+        "created_at": datetime.now().isoformat(),
         "generated_files": [
             {
                 "type": gf.file_type,
@@ -760,7 +696,9 @@ async def get_report_status(report_id: str, db: Session = Depends(get_db)):
 
 @router.get("/reports/{report_id}/image-by-path")
 async def get_image_by_path(report_id: str, path: str, db: Session = Depends(get_db)):
-    """Get image by MinIO path"""
+    """
+    根据 MinIO 路径获取图片
+    """
     try:
         minio = get_minio_client()
         # Path format: bucket/object_name or just object_name
