@@ -31,13 +31,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fonts-wqy-microhei \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy shared modules
-COPY shared/ ./shared/
-
 # Copy service files
 COPY report-service/pyproject.toml ./
 COPY report-service/main.py ./
 COPY report-service/__init__.py ./
+COPY report-service/database.py ./
+COPY report-service/models.py ./
+COPY report-service/minio_client.py ./
 COPY report-service/tara_excel_generator.py ./
 COPY report-service/tara_pdf_generator.py ./
 

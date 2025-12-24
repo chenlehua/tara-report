@@ -3,7 +3,6 @@
 负责上传JSON和图片、生成报告ID、保存数据到MySQL和MinIO
 """
 import os
-import sys
 import json
 import uuid
 import httpx
@@ -20,15 +19,12 @@ import io
 # 报告服务地址
 REPORT_SERVICE_URL = os.getenv("REPORT_SERVICE_URL", "http://report-service:8002")
 
-# 添加共享模块路径
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from shared.database import get_db, init_db, engine, Base
-from shared.models import (
+from database import get_db, init_db, engine, Base
+from models import (
     Report, ReportCover, ReportDefinitions, ReportAsset,
     ReportAttackTree, ReportTARAResult, ReportImage
 )
-from shared.minio_client import get_minio_client, BUCKET_IMAGES
+from minio_client import get_minio_client, BUCKET_IMAGES
 
 # 创建FastAPI应用
 app = FastAPI(

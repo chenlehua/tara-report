@@ -3,7 +3,6 @@
 负责根据报告ID生成Excel和PDF报告，并提供下载功能
 """
 import os
-import sys
 import io
 import tempfile
 import httpx
@@ -17,15 +16,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, FileResponse
 from sqlalchemy.orm import Session
 
-# 添加共享模块路径
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from shared.database import get_db, engine, Base
-from shared.models import (
+from database import get_db, engine, Base
+from models import (
     Report, ReportCover, GeneratedReport, ReportAsset, 
     ReportTARAResult, ReportAttackTree, ReportDefinitions, ReportImage
 )
-from shared.minio_client import get_minio_client, BUCKET_REPORTS, BUCKET_IMAGES
+from minio_client import get_minio_client, BUCKET_REPORTS, BUCKET_IMAGES
 
 from tara_excel_generator import generate_tara_excel_from_json
 from tara_pdf_generator import generate_tara_pdf_from_json
