@@ -1,18 +1,14 @@
 """
 MinIO 客户端配置
 """
-import os
-from minio import Minio
-from minio.error import S3Error
 import io
 from typing import Optional, BinaryIO
 from datetime import timedelta
 
-# MinIO 配置
-MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "minio:9000")
-MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
-MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minioadmin123")
-MINIO_SECURE = os.getenv("MINIO_SECURE", "false").lower() == "true"
+from minio import Minio
+from minio.error import S3Error
+
+from app.common.config import settings
 
 # 桶名称
 BUCKET_IMAGES = "tara-images"
@@ -24,10 +20,10 @@ class MinIOClient:
     
     def __init__(self):
         self.client = Minio(
-            MINIO_ENDPOINT,
-            access_key=MINIO_ACCESS_KEY,
-            secret_key=MINIO_SECRET_KEY,
-            secure=MINIO_SECURE
+            settings.MINIO_ENDPOINT,
+            access_key=settings.MINIO_ACCESS_KEY,
+            secret_key=settings.MINIO_SECRET_KEY,
+            secure=settings.MINIO_SECURE
         )
         self._ensure_buckets()
     
@@ -49,19 +45,7 @@ class MinIOClient:
         length: int,
         content_type: str = "application/octet-stream"
     ) -> str:
-        """
-        上传文件到 MinIO
-        
-        Args:
-            bucket: 桶名称
-            object_name: 对象名称（路径）
-            data: 文件数据流
-            length: 文件大小
-            content_type: 内容类型
-        
-        Returns:
-            str: MinIO 对象路径
-        """
+        """上传文件到 MinIO"""
         try:
             self.client.put_object(
                 bucket,
@@ -81,19 +65,13 @@ class MinIOClient:
         data: bytes,
         content_type: str = "application/octet-stream"
     ) -> str:
-        """
-        上传字节数据到 MinIO
-        """
+        """上传字节数据到 MinIO"""
         data_stream = io.BytesIO(data)
         return self.upload_file(bucket, object_name, data_stream, len(data), content_type)
     
     def download_file(self, bucket: str, object_name: str) -> bytes:
-        """
-        从 MinIO 下载文件
-        
-        Returns:
-            bytes: 文件内容
-        """
+        """从 MinIO 下载文件"""
+        response = None
         try:
             response = self.client.get_object(bucket, object_name)
             return response.read()
@@ -110,18 +88,14 @@ class MinIOClient:
         object_name: str,
         expires: timedelta = timedelta(hours=1)
     ) -> str:
-        """
-        获取预签名URL
-        """
+        """获取预签名URL"""
         try:
             return self.client.presigned_get_object(bucket, object_name, expires=expires)
         except S3Error as e:
             raise Exception(f"Failed to get presigned URL: {e}")
     
     def delete_file(self, bucket: str, object_name: str) -> bool:
-        """
-        删除文件
-        """
+        """删除文件"""
         try:
             self.client.remove_object(bucket, object_name)
             return True
@@ -130,9 +104,7 @@ class MinIOClient:
             return False
     
     def file_exists(self, bucket: str, object_name: str) -> bool:
-        """
-        检查文件是否存在
-        """
+        """检查文件是否存在"""
         try:
             self.client.stat_object(bucket, object_name)
             return True

@@ -10,6 +10,8 @@
 - 🖼️ 支持图片上传（项目边界图、架构图等）
 - 📁 报告管理（列表、预览、下载、删除）
 - 🔄 支持JSON文件和JSON字符串两种输入方式
+- 🗄️ MySQL数据库存储报告数据
+- 📦 MinIO对象存储管理图片和报告文件
 
 ## 中文字体配置
 
@@ -36,7 +38,7 @@ sudo apt-get install fonts-noto-cjk
 ### 手动安装字体
 如果系统字体不可用，可以将中文字体文件（.ttf/.ttc）放到以下目录：
 ```
-backend/tara_api/fonts/
+backend/app/generators/fonts/
 ```
 
 推荐的开源中文字体：
@@ -53,7 +55,7 @@ backend/tara_api/fonts/
 pip install -e .
 
 # 或者使用pip安装依赖
-pip install fastapi uvicorn openpyxl pillow python-multipart pydantic aiofiles
+pip install fastapi uvicorn openpyxl pillow python-multipart pydantic aiofiles sqlalchemy pymysql minio reportlab
 ```
 
 ### 启动服务
@@ -63,10 +65,10 @@ pip install fastapi uvicorn openpyxl pillow python-multipart pydantic aiofiles
 tara-api
 
 # 方式2: 使用uvicorn
-uvicorn tara_api.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 # 方式3: 直接运行
-python -m tara_api.main
+python -m app.main
 ```
 
 ### API文档
@@ -77,9 +79,11 @@ python -m tara_api.main
 
 ## API端点
 
+所有API端点使用 `/api/v1` 前缀。
+
 ### 图片上传
 ```
-POST /api/images/upload
+POST /api/v1/images/upload
 ```
 上传图片，支持类型：
 - `item_boundary`: 项目边界图
@@ -88,134 +92,135 @@ POST /api/images/upload
 - `dataflow`: 数据流图
 - `attack_tree`: 攻击树图
 
-### 生成报告
+### 批量上传生成报告
 ```
-POST /api/reports/generate
+POST /api/v1/upload/batch
+```
+一键上传JSON数据和图片，生成报告。
+
+### 上传报告数据
+```
+POST /api/v1/reports/upload
 ```
 参数：
 - `json_file`: JSON数据文件（可选）
 - `json_data`: JSON数据字符串（可选）
-- `item_boundary_image`: 项目边界图片ID
-- `system_architecture_image`: 系统架构图片ID
-- `software_architecture_image`: 软件架构图片ID
-- `dataflow_image`: 数据流图片ID
-- `attack_tree_images`: 攻击树图片ID列表（逗号分隔）
+- `item_boundary_image`: 项目边界图
+- `system_architecture_image`: 系统架构图
+- `software_architecture_image`: 软件架构图
+- `dataflow_image`: 数据流图
+- `attack_tree_images`: 攻击树图片列表
 
 ### 获取报告列表
 ```
-GET /api/reports
+GET /api/v1/reports
 ```
 
 ### 获取报告详情
 ```
-GET /api/reports/{report_id}
+GET /api/v1/reports/{report_id}
+```
+
+### 生成报告文件
+```
+POST /api/v1/reports/{report_id}/generate?format=xlsx|pdf
 ```
 
 ### 下载报告
 ```
-GET /api/reports/{report_id}/download
+GET /api/v1/reports/{report_id}/download?format=xlsx|pdf
+GET /api/v1/reports/{report_id}/download/{format}
 ```
 
 ### 删除报告
 ```
-DELETE /api/reports/{report_id}
+DELETE /api/v1/reports/{report_id}
 ```
+
+### 健康检查
+```
+GET /api/v1/health
+```
+
+## Docker部署
+
+使用Docker Compose部署完整服务：
+
+```bash
+docker-compose up -d
+```
+
+服务将在以下端口运行：
+- 前端: http://localhost:30031
+- 后端API: http://localhost:8000
+- MySQL: localhost:3306
+- MinIO Console: http://localhost:9001
 
 ## 输入数据格式
 
-```json
-{
-  "cover": {
-    "report_title": "威胁分析和风险评估报告",
-    "report_title_en": "Threat Analysis And Risk Assessment Report",
-    "project_name": "项目名称",
-    "data_level": "秘密",
-    "document_number": "文档编号",
-    "version": "V1.0",
-    "author_date": "2025.01",
-    "review_date": "2025.01"
-  },
-  "definitions": {
-    "title": "相关定义",
-    "functional_description": "功能描述...",
-    "assumptions": [
-      {"id": "ASM-01", "description": "假设描述"}
-    ],
-    "terminology": [
-      {"abbreviation": "IVI", "english": "In-Vehicle Infotainment", "chinese": "车载信息娱乐系统"}
-    ]
-  },
-  "assets": {
-    "title": "资产列表",
-    "assets": [
-      {
-        "id": "P001",
-        "name": "SOC",
-        "category": "内部实体",
-        "remarks": "备注",
-        "authenticity": true,
-        "availability": true
-      }
-    ]
-  },
-  "attack_trees": {
-    "title": "攻击树分析",
-    "attack_trees": [
-      {"title": "攻击树1", "image": ""}
-    ]
-  },
-  "tara_results": {
-    "title": "TARA分析结果",
-    "results": [
-      {
-        "asset_id": "P001",
-        "asset_name": "资产名称",
-        "category": "内部实体",
-        "security_attribute": "Authenticity",
-        "stride_model": "S欺骗",
-        "threat_scenario": "威胁场景描述",
-        "attack_path": "攻击路径描述",
-        "attack_vector": "本地",
-        "attack_complexity": "低",
-        "privileges_required": "低",
-        "user_interaction": "不需要",
-        "safety_impact": "中等的",
-        "financial_impact": "中等的",
-        "operational_impact": "重大的",
-        "privacy_impact": "可忽略不计的",
-        "security_requirement": "安全需求描述"
-      }
-    ]
-  }
-}
-```
+详细的JSON输入格式请参考 `docs/API_SPECIFICATION.md`。
 
 ## 目录结构
 
 ```
 backend/
-├── pyproject.toml              # 项目配置
-├── README.md                   # 说明文档
-├── data-service/               # 数据服务
+├── app/
 │   ├── __init__.py
-│   ├── main.py                 # FastAPI应用
-│   ├── database.py             # 数据库配置
-│   ├── models.py               # SQLAlchemy数据模型
-│   ├── minio_client.py         # MinIO客户端
-│   ├── Dockerfile
-│   └── pyproject.toml
-├── report-service/             # 报告服务
-│   ├── __init__.py
-│   ├── main.py                 # FastAPI应用
-│   ├── database.py             # 数据库配置
-│   ├── models.py               # SQLAlchemy数据模型
-│   ├── minio_client.py         # MinIO客户端
-│   ├── tara_excel_generator.py # Excel生成器
-│   ├── tara_pdf_generator.py   # PDF生成器（支持中文）
-│   ├── Dockerfile
-│   └── pyproject.toml
-└── Dockerfile                  # 后端通用Dockerfile
+│   ├── main.py                 # 主应用入口
+│   ├── config.py               # 配置入口（兼容性）
+│   ├── api/
+│   │   ├── __init__.py
+│   │   └── v1/
+│   │       ├── __init__.py
+│   │       ├── router.py       # API v1 路由器
+│   │       └── endpoints/
+│   │           ├── __init__.py
+│   │           ├── health.py   # 健康检查端点
+│   │           ├── images.py   # 图片管理端点
+│   │           ├── reports.py  # 报告管理端点
+│   │           └── upload.py   # 批量上传端点
+│   ├── common/
+│   │   ├── __init__.py
+│   │   ├── config/
+│   │   │   ├── __init__.py
+│   │   │   └── settings.py     # 应用配置
+│   │   ├── constants/
+│   │   │   ├── __init__.py
+│   │   │   └── enums.py        # 枚举常量
+│   │   ├── database/
+│   │   │   ├── __init__.py
+│   │   │   ├── mysql.py        # MySQL连接
+│   │   │   └── minio.py        # MinIO客户端
+│   │   ├── models/
+│   │   │   ├── __init__.py
+│   │   │   └── report.py       # 数据库模型
+│   │   └── schemas/
+│   │       └── __init__.py
+│   ├── generators/
+│   │   ├── __init__.py
+│   │   ├── excel_generator.py  # Excel报告生成器
+│   │   └── pdf_generator.py    # PDF报告生成器
+│   ├── repositories/
+│   │   └── __init__.py
+│   └── services/
+│       └── __init__.py
+├── Dockerfile
+├── pyproject.toml
+└── README.md
 ```
+
+## 环境变量
+
+| 变量名 | 默认值 | 说明 |
+|--------|--------|------|
+| MYSQL_HOST | mysql | MySQL主机 |
+| MYSQL_PORT | 3306 | MySQL端口 |
+| MYSQL_USER | tara | MySQL用户名 |
+| MYSQL_PASSWORD | tara123456 | MySQL密码 |
+| MYSQL_DATABASE | tara_db | MySQL数据库名 |
+| MINIO_ENDPOINT | minio:9000 | MinIO端点 |
+| MINIO_ACCESS_KEY | minioadmin | MinIO访问密钥 |
+| MINIO_SECRET_KEY | minioadmin123 | MinIO密钥 |
 
 ## 开发
 
@@ -227,7 +232,7 @@ pip install -e ".[dev]"
 pytest
 
 # 代码格式化
-black tara_api/
+black app/
 ```
 
 ## License

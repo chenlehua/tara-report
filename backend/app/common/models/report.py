@@ -1,10 +1,11 @@
 """
-数据库模型定义
+报告相关数据模型定义
 """
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import relationship
-from database import Base
+
+from app.common.database.mysql import Base
 
 
 class Report(Base):

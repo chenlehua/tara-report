@@ -31,6 +31,10 @@ dependencies = [
     "pydantic>=2.5.0",
     "aiofiles>=23.2.1",
     "reportlab>=4.0.0",
+    "sqlalchemy>=2.0.0",
+    "pymysql>=1.1.0",
+    "minio>=7.2.0",
+    "httpx>=0.26.0",
 ]
 
 [project.optional-dependencies]
@@ -39,13 +43,18 @@ dev = [
     "pytest-asyncio>=0.23.0",
     "httpx>=0.26.0",
 ]
+db = [
+    "sqlalchemy>=2.0.0",
+    "pymysql>=1.1.0",
+    "minio>=7.2.0",
+]
 
 [project.scripts]
-tara-api = "tara_api.main:run_server"
+tara-api = "app.main:run_server"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["tara_api*"]
+include = ["app*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
