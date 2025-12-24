@@ -1,7 +1,56 @@
 version: '3.8'
 
 services:
-  # Backend API Service
+  # MySQL 数据库服务
+  mysql:
+    image: mysql:8.0
+    container_name: tara-mysql
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root123456
+      MYSQL_DATABASE: tara_db
+      MYSQL_USER: tara
+      MYSQL_PASSWORD: tara123456
+      TZ: Asia/Shanghai
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql/init:/docker-entrypoint-initdb.d
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot123456"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - tara-network
+
+  # MinIO 对象存储服务
+  minio:
+    image: minio/minio:latest
+    container_name: tara-minio
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - tara-network
+
+  # 后端 API 服务 - 统一的 TARA API
   backend:
     build:
       context: ./backend
@@ -10,21 +59,35 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_USER=tara
+      - MYSQL_PASSWORD=tara123456
+      - MYSQL_DATABASE=tara_db
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin123
+      - MINIO_SECURE=false
     volumes:
       - backend_uploads:/app/uploads
       - backend_reports:/app/reports
-    environment:
-      - PYTHONUNBUFFERED=1
+    depends_on:
+      mysql:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks:
       - tara-network
 
-  # Frontend Web Service
+  # 前端 Web 服务
   frontend:
     build:
       context: ./frontend
@@ -32,13 +95,17 @@ services:
     container_name: tara-frontend
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "30031:30031"
     depends_on:
       - backend
     networks:
       - tara-network
 
 volumes:
+  mysql_data:
+    driver: local
+  minio_data:
+    driver: local
   backend_uploads:
     driver: local
   backend_reports:

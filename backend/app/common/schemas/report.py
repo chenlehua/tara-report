@@ -1,5 +1,5 @@
 """
-TARA API 数据模型定义
+Pydantic Schema 定义
 """
 from typing import List, Optional, Any, Dict
 from pydantic import BaseModel, Field
