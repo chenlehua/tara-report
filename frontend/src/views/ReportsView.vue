@@ -404,13 +404,15 @@ async function handleDelete(reportId, reportName) {
 
 .report-actions {
   display: flex;
-  gap: 12px;
+  gap: 8px;
 }
 
 .report-actions .btn {
   flex: 1;
   justify-content: center;
-  padding: 10px 16px;
+  padding: 10px 12px;
+  white-space: nowrap;
+  font-size: 13px;
 }
 
 .report-actions .btn svg {
@@ -447,7 +449,8 @@ async function handleDelete(reportId, reportName) {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 4px;
+  white-space: nowrap;
 }
 
 .dropdown-arrow {
