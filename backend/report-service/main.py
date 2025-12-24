@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from shared.database import get_db, engine, Base
-from shared.models import Report, ReportCover, GeneratedReport
+from shared.models import Report, ReportCover, GeneratedReport, ReportAsset, ReportTARAResult, ReportAttackTree
 from shared.minio_client import get_minio_client, BUCKET_REPORTS, BUCKET_IMAGES
 
 from tara_excel_generator import generate_tara_excel_from_json
@@ -244,6 +244,80 @@ async def health_check(db: Session = Depends(get_db)):
             "minio": minio_status,
             "data_service": data_service_status
         }
+    }
+
+
+@app.get("/api/reports")
+async def list_reports(
+    page: int = 1,
+    page_size: int = 20,
+    db: Session = Depends(get_db)
+):
+    """
+    获取报告列表
+    
+    Args:
+        page: 页码
+        page_size: 每页数量
+    """
+    offset = (page - 1) * page_size
+    
+    total = db.query(Report).count()
+    reports = db.query(Report).order_by(Report.created_at.desc()).offset(offset).limit(page_size).all()
+    
+    result = []
+    for report in reports:
+        cover = db.query(ReportCover).filter(ReportCover.report_id == report.report_id).first()
+        
+        # 统计信息
+        assets_count = db.query(ReportAsset).filter(ReportAsset.report_id == report.report_id).count()
+        tara_count = db.query(ReportTARAResult).filter(ReportTARAResult.report_id == report.report_id).count()
+        attack_trees_count = db.query(ReportAttackTree).filter(ReportAttackTree.report_id == report.report_id).count()
+        
+        # 计算高风险项数量（operational_impact 为 "重大的" 或 "严重的"）
+        high_risk_count = db.query(ReportTARAResult).filter(
+            ReportTARAResult.report_id == report.report_id,
+            ReportTARAResult.operational_impact.in_(['重大的', '严重的'])
+        ).count()
+        
+        # 获取已生成的报告文件信息
+        generated_files = db.query(GeneratedReport).filter(
+            GeneratedReport.report_id == report.report_id
+        ).all()
+        
+        downloads = {}
+        for gf in generated_files:
+            downloads[gf.file_type] = {
+                "url": f"/api/reports/{report.report_id}/download?format={gf.file_type}",
+                "file_size": gf.file_size,
+                "generated_at": gf.generated_at.isoformat() if gf.generated_at else None
+            }
+        
+        result.append({
+            "id": report.report_id,
+            "report_id": report.report_id,
+            "name": cover.report_title if cover else "TARA报告",
+            "project_name": cover.project_name if cover else "",
+            "report_title": cover.report_title if cover else "",
+            "status": report.status,
+            "created_at": report.created_at.isoformat(),
+            "file_path": "",
+            "statistics": {
+                "assets_count": assets_count,
+                "threats_count": tara_count,
+                "high_risk_count": high_risk_count,
+                "measures_count": tara_count,
+                "attack_trees_count": attack_trees_count
+            },
+            "downloads": downloads
+        })
+    
+    return {
+        "success": True,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "reports": result
     }
 
 

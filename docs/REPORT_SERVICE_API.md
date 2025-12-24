@@ -7,7 +7,7 @@
 - **服务名称**: TARA Report Service
 - **版本**: 1.0.0
 - **端口**: 8002
-- **描述**: 负责根据报告ID生成Excel和PDF报告，并提供下载功能
+- **描述**: 负责获取报告列表、生成Excel和PDF报告，并提供下载功能
 
 ## 基础信息
 
@@ -45,6 +45,21 @@ http://report-service:8002
 
 获取服务状态信息。
 
+**时序图:**
+```
+┌────────┐          ┌────────────────┐
+│ Client │          │ Report Service │
+└───┬────┘          └───────┬────────┘
+    │                       │
+    │  GET /                │
+    │──────────────────────>│
+    │                       │
+    │  { name, version,     │
+    │    status }           │
+    │<──────────────────────│
+    │                       │
+```
+
 **响应示例:**
 ```json
 {
@@ -59,6 +74,38 @@ http://report-service:8002
 #### GET /api/health
 
 健康检查，返回服务和依赖状态。
+
+**时序图:**
+```
+┌────────┐          ┌────────────────┐          ┌───────┐          ┌───────┐          ┌──────────────┐
+│ Client │          │ Report Service │          │ MySQL │          │ MinIO │          │ Data Service │
+└───┬────┘          └───────┬────────┘          └───┬───┘          └───┬───┘          └──────┬───────┘
+    │                       │                       │                  │                     │
+    │  GET /api/health      │                       │                  │                     │
+    │──────────────────────>│                       │                  │                     │
+    │                       │                       │                  │                     │
+    │                       │  SELECT 1             │                  │                     │
+    │                       │──────────────────────>│                  │                     │
+    │                       │                       │                  │                     │
+    │                       │  OK                   │                  │                     │
+    │                       │<──────────────────────│                  │                     │
+    │                       │                       │                  │                     │
+    │                       │  Check connection     │                  │                     │
+    │                       │──────────────────────────────────────────>│                     │
+    │                       │                       │                  │                     │
+    │                       │  OK                   │                  │                     │
+    │                       │<──────────────────────────────────────────│                     │
+    │                       │                       │                  │                     │
+    │                       │  GET /api/health      │                  │                     │
+    │                       │────────────────────────────────────────────────────────────────>│
+    │                       │                       │                  │                     │
+    │                       │  { status }           │                  │                     │
+    │                       │<────────────────────────────────────────────────────────────────│
+    │                       │                       │                  │                     │
+    │  { status, services } │                       │                  │                     │
+    │<──────────────────────│                       │                  │                     │
+    │                       │                       │                  │                     │
+```
 
 **响应示例:**
 ```json
@@ -75,11 +122,169 @@ http://report-service:8002
 
 ---
 
-### 2. 报告生成
+### 2. 报告列表
+
+#### GET /api/reports
+
+获取报告列表。
+
+**时序图:**
+```
+┌────────┐          ┌────────────────┐          ┌───────┐
+│ Client │          │ Report Service │          │ MySQL │
+└───┬────┘          └───────┬────────┘          └───┬───┘
+    │                       │                       │
+    │  GET /api/reports     │                       │
+    │  ?page=1&page_size=20 │                       │
+    │──────────────────────>│                       │
+    │                       │                       │
+    │                       │  Count reports        │
+    │                       │──────────────────────>│
+    │                       │                       │
+    │                       │  Total count          │
+    │                       │<──────────────────────│
+    │                       │                       │
+    │                       │  Query reports        │
+    │                       │  (paginated)          │
+    │                       │──────────────────────>│
+    │                       │                       │
+    │                       │  Report records       │
+    │                       │<──────────────────────│
+    │                       │                       │
+    │                       │  [For each report]    │
+    │                       │  Query cover          │
+    │                       │──────────────────────>│
+    │                       │                       │
+    │                       │  Count assets         │
+    │                       │──────────────────────>│
+    │                       │                       │
+    │                       │  Count tara_results   │
+    │                       │──────────────────────>│
+    │                       │                       │
+    │                       │  Count high_risk      │
+    │                       │  (operational_impact  │
+    │                       │   IN ['重大的','严重的'])│
+    │                       │──────────────────────>│
+    │                       │                       │
+    │                       │  Query generated_files│
+    │                       │──────────────────────>│
+    │                       │                       │
+    │                       │  Build response       │
+    │                       │───────┐               │
+    │                       │       │               │
+    │                       │<──────┘               │
+    │                       │                       │
+    │  { success, total,    │                       │
+    │    page, reports }    │                       │
+    │<──────────────────────│                       │
+    │                       │                       │
+```
+
+**查询参数:**
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| page | int | 1 | 页码 |
+| page_size | int | 20 | 每页数量 |
+
+**响应示例:**
+```json
+{
+  "success": true,
+  "total": 50,
+  "page": 1,
+  "page_size": 20,
+  "reports": [
+    {
+      "id": "RPT-20250115-ABC12345",
+      "report_id": "RPT-20250115-ABC12345",
+      "name": "威胁分析和风险评估报告",
+      "project_name": "项目名称",
+      "report_title": "威胁分析和风险评估报告",
+      "status": "completed",
+      "created_at": "2025-01-15T10:30:00.000000",
+      "file_path": "",
+      "statistics": {
+        "assets_count": 10,
+        "threats_count": 25,
+        "high_risk_count": 5,
+        "measures_count": 25,
+        "attack_trees_count": 3
+      },
+      "downloads": {
+        "xlsx": {
+          "url": "/api/reports/RPT-xxx/download?format=xlsx",
+          "file_size": 125840,
+          "generated_at": "2025-01-15T10:35:00.000000"
+        },
+        "pdf": {
+          "url": "/api/reports/RPT-xxx/download?format=pdf",
+          "file_size": 256000,
+          "generated_at": "2025-01-15T10:36:00.000000"
+        }
+      }
+    }
+  ]
+}
+```
+
+---
+
+### 3. 报告生成
 
 #### POST /api/reports/{report_id}/generate
 
 生成报告文件（Excel或PDF）。
+
+**时序图:**
+```
+┌────────┐          ┌────────────────┐          ┌──────────────┐          ┌───────┐          ┌───────┐
+│ Client │          │ Report Service │          │ Data Service │          │ MySQL │          │ MinIO │
+└───┬────┘          └───────┬────────┘          └──────┬───────┘          └───┬───┘          └───┬───┘
+    │                       │                          │                      │                  │
+    │  POST /api/reports/   │                          │                      │                  │
+    │  {id}/generate        │                          │                      │                  │
+    │  ?format=xlsx         │                          │                      │                  │
+    │──────────────────────>│                          │                      │                  │
+    │                       │                          │                      │                  │
+    │                       │  Check report exists     │                      │                  │
+    │                       │─────────────────────────────────────────────────>│                  │
+    │                       │                          │                      │                  │
+    │                       │  GET /api/reports/{id}/cover                    │                  │
+    │                       │─────────────────────────>│                      │                  │
+    │                       │                          │                      │                  │
+    │                       │  GET /api/reports/{id}/definitions              │                  │
+    │                       │─────────────────────────>│                      │                  │
+    │                       │                          │                      │                  │
+    │                       │  GET /api/reports/{id}/assets                   │                  │
+    │                       │─────────────────────────>│                      │                  │
+    │                       │                          │                      │                  │
+    │                       │  GET /api/reports/{id}/attack-trees             │                  │
+    │                       │─────────────────────────>│                      │                  │
+    │                       │                          │                      │                  │
+    │                       │  GET /api/reports/{id}/tara-results             │                  │
+    │                       │─────────────────────────>│                      │                  │
+    │                       │                          │                      │                  │
+    │                       │  [For each image]        │                      │                  │
+    │                       │  Download from MinIO     │                      │                  │
+    │                       │─────────────────────────────────────────────────────────────────────>│
+    │                       │                          │                      │                  │
+    │                       │  Generate Excel/PDF      │                      │                  │
+    │                       │───────┐                  │                      │                  │
+    │                       │       │                  │                      │                  │
+    │                       │<──────┘                  │                      │                  │
+    │                       │                          │                      │                  │
+    │                       │  Upload to MinIO         │                      │                  │
+    │                       │─────────────────────────────────────────────────────────────────────>│
+    │                       │                          │                      │                  │
+    │                       │  Save generated_report   │                      │                  │
+    │                       │─────────────────────────────────────────────────>│                  │
+    │                       │                          │                      │                  │
+    │  { success,           │                          │                      │                  │
+    │    download_url }     │                          │                      │                  │
+    │<──────────────────────│                          │                      │                  │
+    │                       │                          │                      │                  │
+```
 
 **路径参数:**
 
@@ -115,11 +320,44 @@ http://report-service:8002
 
 ---
 
-### 3. 报告下载
+### 4. 报告下载
 
 #### GET /api/reports/{report_id}/download
 
 下载报告文件（格式作为查询参数）。
+
+**时序图:**
+```
+┌────────┐          ┌────────────────┐          ┌───────┐          ┌───────┐
+│ Client │          │ Report Service │          │ MySQL │          │ MinIO │
+└───┬────┘          └───────┬────────┘          └───┬───┘          └───┬───┘
+    │                       │                       │                  │
+    │  GET /api/reports/    │                       │                  │
+    │  {id}/download        │                       │                  │
+    │  ?format=xlsx         │                       │                  │
+    │──────────────────────>│                       │                  │
+    │                       │                       │                  │
+    │                       │  Query generated_report                  │
+    │                       │──────────────────────>│                  │
+    │                       │                       │                  │
+    │                       │  Generated report info│                  │
+    │                       │<──────────────────────│                  │
+    │                       │                       │                  │
+    │                       │  Download file        │                  │
+    │                       │─────────────────────────────────────────>│
+    │                       │                       │                  │
+    │                       │  File content         │                  │
+    │                       │<─────────────────────────────────────────│
+    │                       │                       │                  │
+    │                       │  Query cover          │                  │
+    │                       │  (for filename)       │                  │
+    │                       │──────────────────────>│                  │
+    │                       │                       │                  │
+    │  File stream          │                       │                  │
+    │  (Content-Disposition)│                       │                  │
+    │<──────────────────────│                       │                  │
+    │                       │                       │                  │
+```
 
 **路径参数:**
 
@@ -151,6 +389,23 @@ http://report-service:8002
 
 下载报告文件（格式作为路径参数）。
 
+**时序图:**
+```
+┌────────┐          ┌────────────────┐          ┌───────┐          ┌───────┐
+│ Client │          │ Report Service │          │ MySQL │          │ MinIO │
+└───┬────┘          └───────┬────────┘          └───┬───┘          └───┬───┘
+    │                       │                       │                  │
+    │  GET /api/reports/    │                       │                  │
+    │  {id}/download/xlsx   │                       │                  │
+    │──────────────────────>│                       │                  │
+    │                       │                       │                  │
+    │                       │  [Same as above]      │                  │
+    │                       │                       │                  │
+    │  File stream          │                       │                  │
+    │<──────────────────────│                       │                  │
+    │                       │                       │                  │
+```
+
 **路径参数:**
 
 | 参数 | 类型 | 说明 |
@@ -162,11 +417,68 @@ http://report-service:8002
 
 ---
 
-### 4. 报告预览
+### 5. 报告预览
 
 #### GET /api/reports/{report_id}/preview
 
 获取报告预览数据。
+
+**时序图:**
+```
+┌────────┐          ┌────────────────┐          ┌──────────────┐          ┌───────┐
+│ Client │          │ Report Service │          │ Data Service │          │ MySQL │
+└───┬────┘          └───────┬────────┘          └──────┬───────┘          └───┬───┘
+    │                       │                          │                      │
+    │  GET /api/reports/    │                          │                      │
+    │  {id}/preview         │                          │                      │
+    │──────────────────────>│                          │                      │
+    │                       │                          │                      │
+    │                       │  GET /api/reports/{id}/cover                    │
+    │                       │─────────────────────────>│                      │
+    │                       │                          │                      │
+    │                       │  Cover data              │                      │
+    │                       │<─────────────────────────│                      │
+    │                       │                          │                      │
+    │                       │  GET /api/reports/{id}/definitions              │
+    │                       │─────────────────────────>│                      │
+    │                       │                          │                      │
+    │                       │  Definitions data        │                      │
+    │                       │<─────────────────────────│                      │
+    │                       │                          │                      │
+    │                       │  GET /api/reports/{id}/assets                   │
+    │                       │─────────────────────────>│                      │
+    │                       │                          │                      │
+    │                       │  Assets data             │                      │
+    │                       │<─────────────────────────│                      │
+    │                       │                          │                      │
+    │                       │  GET /api/reports/{id}/attack-trees             │
+    │                       │─────────────────────────>│                      │
+    │                       │                          │                      │
+    │                       │  Attack trees data       │                      │
+    │                       │<─────────────────────────│                      │
+    │                       │                          │                      │
+    │                       │  GET /api/reports/{id}/tara-results             │
+    │                       │─────────────────────────>│                      │
+    │                       │                          │                      │
+    │                       │  TARA results data       │                      │
+    │                       │<─────────────────────────│                      │
+    │                       │                          │                      │
+    │                       │  Query generated_files   │                      │
+    │                       │─────────────────────────────────────────────────>│
+    │                       │                          │                      │
+    │                       │  Query report & cover    │                      │
+    │                       │─────────────────────────────────────────────────>│
+    │                       │                          │                      │
+    │                       │  Build preview data      │                      │
+    │                       │───────┐                  │                      │
+    │                       │       │                  │                      │
+    │                       │<──────┘                  │                      │
+    │                       │                          │                      │
+    │  { preview data,      │                          │                      │
+    │    downloads }        │                          │                      │
+    │<──────────────────────│                          │                      │
+    │                       │                          │                      │
+```
 
 **路径参数:**
 
@@ -191,58 +503,12 @@ http://report-service:8002
     "measures_count": 25,
     "attack_trees_count": 3
   },
-  "report_info": {
-    "id": "RPT-20250115-ABC12345",
-    "name": "威胁分析和风险评估报告",
-    "project_name": "项目名称",
-    "version": "V1.0",
-    "created_at": "2025-01-15T10:30:00.000000",
-    "file_path": "",
-    "file_size": 0,
-    "statistics": {}
-  },
-  "cover": {
-    "report_title": "威胁分析和风险评估报告",
-    "report_title_en": "Threat Analysis And Risk Assessment Report",
-    "project_name": "项目名称",
-    "data_level": "秘密",
-    "document_number": "DOC-001",
-    "version": "V1.0",
-    "author_date": "2025.01",
-    "review_date": "2025.01",
-    "sign_date": "",
-    "approve_date": ""
-  },
-  "definitions": {
-    "title": "相关定义",
-    "functional_description": "功能描述...",
-    "item_boundary_image": "/api/reports/RPT-xxx/image-by-path?path=...",
-    "system_architecture_image": "/api/reports/RPT-xxx/image-by-path?path=...",
-    "software_architecture_image": "/api/reports/RPT-xxx/image-by-path?path=...",
-    "assumptions": [],
-    "terminology": []
-  },
-  "assets": {
-    "title": "资产列表",
-    "assets": [],
-    "dataflow_image": null
-  },
-  "attack_trees": {
-    "title": "攻击树分析",
-    "attack_trees": [
-      {
-        "asset_id": "P001",
-        "asset_name": "SOC",
-        "title": "攻击树1",
-        "image": "path/to/image",
-        "image_url": "/api/reports/RPT-xxx/image-by-path?path=..."
-      }
-    ]
-  },
-  "tara_results": {
-    "title": "TARA分析结果",
-    "results": []
-  },
+  "report_info": {...},
+  "cover": {...},
+  "definitions": {...},
+  "assets": {...},
+  "attack_trees": {...},
+  "tara_results": {...},
   "downloads": {
     "xlsx": {
       "url": "/api/reports/RPT-xxx/download?format=xlsx",
@@ -260,11 +526,39 @@ http://report-service:8002
 
 ---
 
-### 5. 报告状态
+### 6. 报告状态
 
 #### GET /api/reports/{report_id}/status
 
 获取报告状态信息。
+
+**时序图:**
+```
+┌────────┐          ┌────────────────┐          ┌───────┐
+│ Client │          │ Report Service │          │ MySQL │
+└───┬────┘          └───────┬────────┘          └───┬───┘
+    │                       │                       │
+    │  GET /api/reports/    │                       │
+    │  {id}/status          │                       │
+    │──────────────────────>│                       │
+    │                       │                       │
+    │                       │  Query report         │
+    │                       │──────────────────────>│
+    │                       │                       │
+    │                       │  Report record        │
+    │                       │<──────────────────────│
+    │                       │                       │
+    │                       │  Query generated_files│
+    │                       │──────────────────────>│
+    │                       │                       │
+    │                       │  Generated file records
+    │                       │<──────────────────────│
+    │                       │                       │
+    │  { report_id, status, │                       │
+    │    generated_files }  │                       │
+    │<──────────────────────│                       │
+    │                       │                       │
+```
 
 **路径参数:**
 
@@ -341,6 +635,7 @@ PDF报告包含与Excel相同的内容，支持中文字体显示。
 ### MySQL
 
 - 存储生成报告的元数据
+- 查询报告列表和统计信息
 
 ---
 
@@ -388,6 +683,12 @@ PDF报告包含与Excel相同的内容，支持中文字体显示。
 
 ## 使用示例
 
+### 获取报告列表
+
+```bash
+curl "http://report-service:8002/api/reports?page=1&page_size=20"
+```
+
 ### 生成Excel报告
 
 ```bash
@@ -416,35 +717,72 @@ curl "http://report-service:8002/api/reports/RPT-20250115-ABC12345/preview"
 
 ---
 
-## 工作流程
+## 完整工作流程
+
+### 一键生成报告流程
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Report Generation Flow                    │
-└─────────────────────────────────────────────────────────────────┘
+┌────────┐          ┌───────┐          ┌──────────────┐          ┌────────────────┐          ┌───────┐          ┌───────┐
+│ Client │          │ Nginx │          │ Data Service │          │ Report Service │          │ MySQL │          │ MinIO │
+└───┬────┘          └───┬───┘          └──────┬───────┘          └───────┬────────┘          └───┬───┘          └───┬───┘
+    │                   │                     │                          │                      │                  │
+    │  POST /api/upload/batch                 │                          │                      │                  │
+    │  [json, images]   │                     │                          │                      │                  │
+    │──────────────────>│                     │                          │                      │                  │
+    │                   │                     │                          │                      │                  │
+    │                   │  Proxy to data-service                         │                      │                  │
+    │                   │────────────────────>│                          │                      │                  │
+    │                   │                     │                          │                      │                  │
+    │                   │                     │  Save data to MySQL      │                      │                  │
+    │                   │                     │─────────────────────────────────────────────────>│                  │
+    │                   │                     │                          │                      │                  │
+    │                   │                     │  Upload images to MinIO  │                      │                  │
+    │                   │                     │─────────────────────────────────────────────────────────────────────>│
+    │                   │                     │                          │                      │                  │
+    │                   │                     │  POST /generate (xlsx)   │                      │                  │
+    │                   │                     │─────────────────────────>│                      │                  │
+    │                   │                     │                          │                      │                  │
+    │                   │                     │  POST /generate (pdf)    │                      │                  │
+    │                   │                     │─────────────────────────>│                      │                  │
+    │                   │                     │                          │                      │                  │
+    │  { success, report_id }                 │                          │                      │                  │
+    │<──────────────────────────────────────────                         │                      │                  │
+    │                   │                     │                          │                      │                  │
+```
 
-1. 客户端请求生成报告
-   POST /api/reports/{report_id}/generate?format=xlsx
+### 报告列表和预览流程
 
-2. 报告服务从数据服务获取数据
-   GET http://data-service:8001/api/reports/{report_id}/cover
-   GET http://data-service:8001/api/reports/{report_id}/definitions
-   GET http://data-service:8001/api/reports/{report_id}/assets
-   GET http://data-service:8001/api/reports/{report_id}/attack-trees
-   GET http://data-service:8001/api/reports/{report_id}/tara-results
-
-3. 报告服务从MinIO下载图片到临时文件
-
-4. 报告服务生成报告文件 (Excel/PDF)
-
-5. 报告服务上传生成的报告到MinIO
-
-6. 报告服务更新数据库记录
-
-7. 返回生成结果和下载链接
-
-8. 客户端下载报告
-   GET /api/reports/{report_id}/download?format=xlsx
+```
+┌────────┐          ┌───────┐          ┌────────────────┐          ┌──────────────┐          ┌───────┐
+│ Client │          │ Nginx │          │ Report Service │          │ Data Service │          │ MySQL │
+└───┬────┘          └───┬───┘          └───────┬────────┘          └──────┬───────┘          └───┬───┘
+    │                   │                      │                          │                      │
+    │  GET /api/reports │                      │                          │                      │
+    │──────────────────>│                      │                          │                      │
+    │                   │                      │                          │                      │
+    │                   │  Proxy to report-service                        │                      │
+    │                   │─────────────────────>│                          │                      │
+    │                   │                      │                          │                      │
+    │                   │                      │  Query reports from MySQL│                      │
+    │                   │                      │─────────────────────────────────────────────────>│
+    │                   │                      │                          │                      │
+    │  { reports list } │                      │                          │                      │
+    │<──────────────────────────────────────────                          │                      │
+    │                   │                      │                          │                      │
+    │  GET /api/reports/{id}/preview           │                          │                      │
+    │──────────────────>│                      │                          │                      │
+    │                   │                      │                          │                      │
+    │                   │  Proxy to report-service                        │                      │
+    │                   │─────────────────────>│                          │                      │
+    │                   │                      │                          │                      │
+    │                   │                      │  GET cover, definitions, │                      │
+    │                   │                      │  assets, attack-trees,   │                      │
+    │                   │                      │  tara-results            │                      │
+    │                   │                      │─────────────────────────>│                      │
+    │                   │                      │                          │                      │
+    │  { preview data } │                      │                          │                      │
+    │<──────────────────────────────────────────                          │                      │
+    │                   │                      │                          │                      │
 ```
 
 ---
@@ -458,3 +796,5 @@ curl "http://report-service:8002/api/reports/RPT-20250115-ABC12345/preview"
 3. **临时文件清理**: 报告生成过程中会创建临时文件，生成完成后会自动清理
 
 4. **并发限制**: 建议对报告生成接口进行并发限制，避免资源耗尽
+
+5. **报告列表接口**: `GET /api/reports` 已从数据服务迁移到报告服务，包含了报告统计信息和已生成文件的下载链接

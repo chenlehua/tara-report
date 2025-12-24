@@ -45,6 +45,21 @@ http://data-service:8001
 
 获取服务状态信息。
 
+**时序图:**
+```
+┌────────┐          ┌──────────────┐
+│ Client │          │ Data Service │
+└───┬────┘          └──────┬───────┘
+    │                      │
+    │  GET /               │
+    │─────────────────────>│
+    │                      │
+    │  { name, version,    │
+    │    status }          │
+    │<─────────────────────│
+    │                      │
+```
+
 **响应示例:**
 ```json
 {
@@ -59,6 +74,32 @@ http://data-service:8001
 #### GET /api/health
 
 健康检查，返回服务和依赖状态。
+
+**时序图:**
+```
+┌────────┐          ┌──────────────┐          ┌───────┐          ┌───────┐
+│ Client │          │ Data Service │          │ MySQL │          │ MinIO │
+└───┬────┘          └──────┬───────┘          └───┬───┘          └───┬───┘
+    │                      │                      │                  │
+    │  GET /api/health     │                      │                  │
+    │─────────────────────>│                      │                  │
+    │                      │                      │                  │
+    │                      │  SELECT 1            │                  │
+    │                      │─────────────────────>│                  │
+    │                      │                      │                  │
+    │                      │  OK                  │                  │
+    │                      │<─────────────────────│                  │
+    │                      │                      │                  │
+    │                      │  Check connection    │                  │
+    │                      │─────────────────────────────────────────>│
+    │                      │                      │                  │
+    │                      │  OK                  │                  │
+    │                      │<─────────────────────────────────────────│
+    │                      │                      │                  │
+    │  { status, services }│                      │                  │
+    │<─────────────────────│                      │                  │
+    │                      │                      │                  │
+```
 
 **响应示例:**
 ```json
@@ -79,6 +120,45 @@ http://data-service:8001
 #### POST /api/images/upload
 
 上传图片（临时存储）。
+
+**时序图:**
+```
+┌────────┐          ┌──────────────┐          ┌───────┐
+│ Client │          │ Data Service │          │ MinIO │
+└───┬────┘          └──────┬───────┘          └───┬───┘
+    │                      │                      │
+    │  POST /api/images/   │                      │
+    │  upload              │                      │
+    │  [file, image_type]  │                      │
+    │─────────────────────>│                      │
+    │                      │                      │
+    │                      │  Validate file type  │
+    │                      │──────┐               │
+    │                      │      │               │
+    │                      │<─────┘               │
+    │                      │                      │
+    │                      │  Generate image_id   │
+    │                      │──────┐               │
+    │                      │      │               │
+    │                      │<─────┘               │
+    │                      │                      │
+    │                      │  Upload to temp/     │
+    │                      │─────────────────────>│
+    │                      │                      │
+    │                      │  OK                  │
+    │                      │<─────────────────────│
+    │                      │                      │
+    │                      │  Store temp info     │
+    │                      │──────┐               │
+    │                      │      │               │
+    │                      │<─────┘               │
+    │                      │                      │
+    │  { success,          │                      │
+    │    image_id,         │                      │
+    │    image_url }       │                      │
+    │<─────────────────────│                      │
+    │                      │                      │
+```
 
 **请求参数 (multipart/form-data):**
 
@@ -113,6 +193,39 @@ http://data-service:8001
 
 获取图片。
 
+**时序图:**
+```
+┌────────┐          ┌──────────────┐          ┌───────┐          ┌───────┐
+│ Client │          │ Data Service │          │ MySQL │          │ MinIO │
+└───┬────┘          └──────┬───────┘          └───┬───┘          └───┬───┘
+    │                      │                      │                  │
+    │  GET /api/images/    │                      │                  │
+    │  {image_id}          │                      │                  │
+    │─────────────────────>│                      │                  │
+    │                      │                      │                  │
+    │                      │  Check temp storage  │                  │
+    │                      │──────┐               │                  │
+    │                      │      │               │                  │
+    │                      │<─────┘               │                  │
+    │                      │                      │                  │
+    │                      │  [If not in temp]    │                  │
+    │                      │  Query image info    │                  │
+    │                      │─────────────────────>│                  │
+    │                      │                      │                  │
+    │                      │  Image record        │                  │
+    │                      │<─────────────────────│                  │
+    │                      │                      │                  │
+    │                      │  Download image      │                  │
+    │                      │─────────────────────────────────────────>│
+    │                      │                      │                  │
+    │                      │  Image content       │                  │
+    │                      │<─────────────────────────────────────────│
+    │                      │                      │                  │
+    │  Image stream        │                      │                  │
+    │<─────────────────────│                      │                  │
+    │                      │                      │                  │
+```
+
 **路径参数:**
 
 | 参数 | 类型 | 说明 |
@@ -128,6 +241,46 @@ http://data-service:8001
 #### POST /api/reports/upload
 
 上传JSON参数和图片，生成报告ID并保存数据到数据库。
+
+**时序图:**
+```
+┌────────┐          ┌──────────────┐          ┌───────┐          ┌───────┐
+│ Client │          │ Data Service │          │ MySQL │          │ MinIO │
+└───┬────┘          └──────┬───────┘          └───┬───┘          └───┬───┘
+    │                      │                      │                  │
+    │  POST /api/reports/  │                      │                  │
+    │  upload              │                      │                  │
+    │  [json, images]      │                      │                  │
+    │─────────────────────>│                      │                  │
+    │                      │                      │                  │
+    │                      │  Parse JSON          │                  │
+    │                      │──────┐               │                  │
+    │                      │      │               │                  │
+    │                      │<─────┘               │                  │
+    │                      │                      │                  │
+    │                      │  Generate report_id  │                  │
+    │                      │──────┐               │                  │
+    │                      │      │               │                  │
+    │                      │<─────┘               │                  │
+    │                      │                      │                  │
+    │                      │  Create report       │                  │
+    │                      │─────────────────────>│                  │
+    │                      │                      │                  │
+    │                      │  [For each image]    │                  │
+    │                      │  Upload image        │                  │
+    │                      │─────────────────────────────────────────>│
+    │                      │                      │                  │
+    │                      │  Save cover,         │                  │
+    │                      │  definitions,        │                  │
+    │                      │  assets, etc.        │                  │
+    │                      │─────────────────────>│                  │
+    │                      │                      │                  │
+    │  { success,          │                      │                  │
+    │    report_id,        │                      │                  │
+    │    statistics }      │                      │                  │
+    │<─────────────────────│                      │                  │
+    │                      │                      │                  │
+```
 
 **请求参数 (multipart/form-data):**
 
@@ -163,6 +316,36 @@ http://data-service:8001
 #### POST /api/upload/batch
 
 批量上传JSON和图片文件，一键生成报告。
+
+**时序图:**
+```
+┌────────┐          ┌──────────────┐          ┌────────────────┐          ┌───────┐          ┌───────┐
+│ Client │          │ Data Service │          │ Report Service │          │ MySQL │          │ MinIO │
+└───┬────┘          └──────┬───────┘          └───────┬────────┘          └───┬───┘          └───┬───┘
+    │                      │                          │                      │                  │
+    │  POST /api/upload/   │                          │                      │                  │
+    │  batch               │                          │                      │                  │
+    │  [json, images]      │                          │                      │                  │
+    │─────────────────────>│                          │                      │                  │
+    │                      │                          │                      │                  │
+    │                      │  Parse JSON & save       │                      │                  │
+    │                      │──────────────────────────────────────────────────>│                  │
+    │                      │                          │                      │                  │
+    │                      │  Upload images           │                      │                  │
+    │                      │─────────────────────────────────────────────────────────────────────>│
+    │                      │                          │                      │                  │
+    │                      │  POST /generate (xlsx)   │                      │                  │
+    │                      │─────────────────────────>│                      │                  │
+    │                      │                          │                      │                  │
+    │                      │  POST /generate (pdf)    │                      │                  │
+    │                      │─────────────────────────>│                      │                  │
+    │                      │                          │                      │                  │
+    │  { success,          │                          │                      │                  │
+    │    report_id,        │                          │                      │                  │
+    │    report_info }     │                          │                      │                  │
+    │<─────────────────────│                          │                      │                  │
+    │                      │                          │                      │                  │
+```
 
 **请求参数 (multipart/form-data):**
 
@@ -203,51 +386,47 @@ http://data-service:8001
 
 ---
 
-#### GET /api/reports
-
-获取报告列表。
-
-**查询参数:**
-
-| 参数 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| page | int | 1 | 页码 |
-| page_size | int | 20 | 每页数量 |
-
-**响应示例:**
-```json
-{
-  "success": true,
-  "total": 50,
-  "page": 1,
-  "page_size": 20,
-  "reports": [
-    {
-      "id": "RPT-20250115-ABC12345",
-      "report_id": "RPT-20250115-ABC12345",
-      "name": "威胁分析和风险评估报告",
-      "project_name": "项目名称",
-      "report_title": "威胁分析和风险评估报告",
-      "status": "completed",
-      "created_at": "2025-01-15T10:30:00.000000",
-      "file_path": "",
-      "statistics": {
-        "assets_count": 10,
-        "threats_count": 25,
-        "high_risk_count": 5,
-        "measures_count": 25,
-        "attack_trees_count": 3
-      }
-    }
-  ]
-}
-```
-
----
-
 #### GET /api/reports/{report_id}
 
 获取报告完整信息（用于预览）。
+
+**时序图:**
+```
+┌────────┐          ┌──────────────┐          ┌───────┐
+│ Client │          │ Data Service │          │ MySQL │
+└───┬────┘          └──────┬───────┘          └───┬───┘
+    │                      │                      │
+    │  GET /api/reports/   │                      │
+    │  {report_id}         │                      │
+    │─────────────────────>│                      │
+    │                      │                      │
+    │                      │  Query report        │
+    │                      │─────────────────────>│
+    │                      │                      │
+    │                      │  Query cover         │
+    │                      │─────────────────────>│
+    │                      │                      │
+    │                      │  Query definitions   │
+    │                      │─────────────────────>│
+    │                      │                      │
+    │                      │  Query assets        │
+    │                      │─────────────────────>│
+    │                      │                      │
+    │                      │  Query attack_trees  │
+    │                      │─────────────────────>│
+    │                      │                      │
+    │                      │  Query tara_results  │
+    │                      │─────────────────────>│
+    │                      │                      │
+    │                      │  Build response      │
+    │                      │──────┐               │
+    │                      │      │               │
+    │                      │<─────┘               │
+    │                      │                      │
+    │  { report data }     │                      │
+    │<─────────────────────│                      │
+    │                      │                      │
+```
 
 **路径参数:**
 
@@ -266,47 +445,12 @@ http://data-service:8001
   "created_at": "2025-01-15T10:30:00.000000",
   "updated_at": null,
   "file_path": "",
-  "statistics": {
-    "assets_count": 10,
-    "threats_count": 25,
-    "high_risk_count": 5,
-    "measures_count": 25,
-    "attack_trees_count": 3
-  },
-  "cover": {
-    "report_title": "威胁分析和风险评估报告",
-    "report_title_en": "Threat Analysis And Risk Assessment Report",
-    "project_name": "项目名称",
-    "data_level": "秘密",
-    "document_number": "DOC-001",
-    "version": "V1.0",
-    "author_date": "2025.01",
-    "review_date": "2025.01",
-    "sign_date": "",
-    "approve_date": ""
-  },
-  "definitions": {
-    "title": "相关定义",
-    "functional_description": "功能描述...",
-    "item_boundary_image": "/api/reports/RPT-20250115-ABC12345/image-by-path?path=...",
-    "system_architecture_image": "/api/reports/RPT-20250115-ABC12345/image-by-path?path=...",
-    "software_architecture_image": "/api/reports/RPT-20250115-ABC12345/image-by-path?path=...",
-    "assumptions": [],
-    "terminology": []
-  },
-  "assets": {
-    "title": "资产列表",
-    "assets": [],
-    "dataflow_image": null
-  },
-  "attack_trees": {
-    "title": "攻击树分析",
-    "attack_trees": []
-  },
-  "tara_results": {
-    "title": "TARA分析结果",
-    "results": []
-  }
+  "statistics": {...},
+  "cover": {...},
+  "definitions": {...},
+  "assets": {...},
+  "attack_trees": {...},
+  "tara_results": {...}
 }
 ```
 
@@ -315,6 +459,27 @@ http://data-service:8001
 #### GET /api/reports/{report_id}/cover
 
 获取报告封面信息。
+
+**时序图:**
+```
+┌────────┐          ┌──────────────┐          ┌───────┐
+│ Client │          │ Data Service │          │ MySQL │
+└───┬────┘          └──────┬───────┘          └───┬───┘
+    │                      │                      │
+    │  GET /api/reports/   │                      │
+    │  {report_id}/cover   │                      │
+    │─────────────────────>│                      │
+    │                      │                      │
+    │                      │  Query cover         │
+    │                      │─────────────────────>│
+    │                      │                      │
+    │                      │  Cover record        │
+    │                      │<─────────────────────│
+    │                      │                      │
+    │  { cover data }      │                      │
+    │<─────────────────────│                      │
+    │                      │                      │
+```
 
 **响应示例:**
 ```json
@@ -338,6 +503,27 @@ http://data-service:8001
 
 获取报告相关定义。
 
+**时序图:**
+```
+┌────────┐          ┌──────────────┐          ┌───────┐
+│ Client │          │ Data Service │          │ MySQL │
+└───┬────┘          └──────┬───────┘          └───┬───┘
+    │                      │                      │
+    │  GET /api/reports/   │                      │
+    │  {id}/definitions    │                      │
+    │─────────────────────>│                      │
+    │                      │                      │
+    │                      │  Query definitions   │
+    │                      │─────────────────────>│
+    │                      │                      │
+    │                      │  Definitions record  │
+    │                      │<─────────────────────│
+    │                      │                      │
+    │  { definitions }     │                      │
+    │<─────────────────────│                      │
+    │                      │                      │
+```
+
 **响应示例:**
 ```json
 {
@@ -347,12 +533,8 @@ http://data-service:8001
   "system_architecture_image": "path/to/image",
   "software_architecture_image": "path/to/image",
   "dataflow_image": "path/to/image",
-  "assumptions": [
-    {"id": "ASM-01", "description": "假设描述"}
-  ],
-  "terminology": [
-    {"abbreviation": "IVI", "english": "In-Vehicle Infotainment", "chinese": "车载信息娱乐系统"}
-  ]
+  "assumptions": [...],
+  "terminology": [...]
 }
 ```
 
@@ -362,25 +544,36 @@ http://data-service:8001
 
 获取报告资产列表。
 
+**时序图:**
+```
+┌────────┐          ┌──────────────┐          ┌───────┐
+│ Client │          │ Data Service │          │ MySQL │
+└───┬────┘          └──────┬───────┘          └───┬───┘
+    │                      │                      │
+    │  GET /api/reports/   │                      │
+    │  {id}/assets         │                      │
+    │─────────────────────>│                      │
+    │                      │                      │
+    │                      │  Query definitions   │
+    │                      │─────────────────────>│
+    │                      │                      │
+    │                      │  Query assets        │
+    │                      │─────────────────────>│
+    │                      │                      │
+    │                      │  Query cover         │
+    │                      │─────────────────────>│
+    │                      │                      │
+    │  { assets data }     │                      │
+    │<─────────────────────│                      │
+    │                      │                      │
+```
+
 **响应示例:**
 ```json
 {
   "title": "项目名称 - 资产列表 Asset List",
   "dataflow_image": "path/to/image",
-  "assets": [
-    {
-      "id": "P001",
-      "name": "SOC",
-      "category": "内部实体",
-      "remarks": "备注",
-      "authenticity": true,
-      "integrity": false,
-      "non_repudiation": false,
-      "confidentiality": false,
-      "availability": true,
-      "authorization": false
-    }
-  ]
+  "assets": [...]
 }
 ```
 
@@ -390,18 +583,32 @@ http://data-service:8001
 
 获取报告攻击树。
 
+**时序图:**
+```
+┌────────┐          ┌──────────────┐          ┌───────┐
+│ Client │          │ Data Service │          │ MySQL │
+└───┬────┘          └──────┬───────┘          └───┬───┘
+    │                      │                      │
+    │  GET /api/reports/   │                      │
+    │  {id}/attack-trees   │                      │
+    │─────────────────────>│                      │
+    │                      │                      │
+    │                      │  Query attack_trees  │
+    │                      │─────────────────────>│
+    │                      │                      │
+    │                      │  Attack tree records │
+    │                      │<─────────────────────│
+    │                      │                      │
+    │  { attack_trees }    │                      │
+    │<─────────────────────│                      │
+    │                      │                      │
+```
+
 **响应示例:**
 ```json
 {
   "title": "攻击树分析 Attack Tree Analysis",
-  "attack_trees": [
-    {
-      "asset_id": "P001",
-      "asset_name": "SOC",
-      "title": "攻击树1",
-      "image": "path/to/image"
-    }
-  ]
+  "attack_trees": [...]
 }
 ```
 
@@ -411,35 +618,32 @@ http://data-service:8001
 
 获取TARA分析结果。
 
+**时序图:**
+```
+┌────────┐          ┌──────────────┐          ┌───────┐
+│ Client │          │ Data Service │          │ MySQL │
+└───┬────┘          └──────┬───────┘          └───┬───┘
+    │                      │                      │
+    │  GET /api/reports/   │                      │
+    │  {id}/tara-results   │                      │
+    │─────────────────────>│                      │
+    │                      │                      │
+    │                      │  Query tara_results  │
+    │                      │─────────────────────>│
+    │                      │                      │
+    │                      │  TARA result records │
+    │                      │<─────────────────────│
+    │                      │                      │
+    │  { tara_results }    │                      │
+    │<─────────────────────│                      │
+    │                      │                      │
+```
+
 **响应示例:**
 ```json
 {
   "title": "TARA分析结果 TARA Analysis Results",
-  "results": [
-    {
-      "asset_id": "P001",
-      "asset_name": "资产名称",
-      "subdomain1": "",
-      "subdomain2": "",
-      "subdomain3": "",
-      "category": "内部实体",
-      "security_attribute": "Authenticity",
-      "stride_model": "S欺骗",
-      "threat_scenario": "威胁场景描述",
-      "attack_path": "攻击路径描述",
-      "wp29_mapping": "",
-      "attack_vector": "本地",
-      "attack_complexity": "低",
-      "privileges_required": "低",
-      "user_interaction": "不需要",
-      "safety_impact": "中等的",
-      "financial_impact": "中等的",
-      "operational_impact": "重大的",
-      "privacy_impact": "可忽略不计的",
-      "security_goal": "",
-      "security_requirement": "安全需求描述"
-    }
-  ]
+  "results": [...]
 }
 ```
 
@@ -448,6 +652,33 @@ http://data-service:8001
 #### GET /api/reports/{report_id}/images/{image_id}
 
 获取报告关联的图片。
+
+**时序图:**
+```
+┌────────┐          ┌──────────────┐          ┌───────┐          ┌───────┐
+│ Client │          │ Data Service │          │ MySQL │          │ MinIO │
+└───┬────┘          └──────┬───────┘          └───┬───┘          └───┬───┘
+    │                      │                      │                  │
+    │  GET /api/reports/   │                      │                  │
+    │  {id}/images/{img}   │                      │                  │
+    │─────────────────────>│                      │                  │
+    │                      │                      │                  │
+    │                      │  Query image record  │                  │
+    │                      │─────────────────────>│                  │
+    │                      │                      │                  │
+    │                      │  Image info          │                  │
+    │                      │<─────────────────────│                  │
+    │                      │                      │                  │
+    │                      │  Download image      │                  │
+    │                      │─────────────────────────────────────────>│
+    │                      │                      │                  │
+    │                      │  Image content       │                  │
+    │                      │<─────────────────────────────────────────│
+    │                      │                      │                  │
+    │  Image stream        │                      │                  │
+    │<─────────────────────│                      │                  │
+    │                      │                      │                  │
+```
 
 **路径参数:**
 
@@ -464,6 +695,28 @@ http://data-service:8001
 
 根据MinIO路径获取图片。
 
+**时序图:**
+```
+┌────────┐          ┌──────────────┐          ┌───────┐
+│ Client │          │ Data Service │          │ MinIO │
+└───┬────┘          └──────┬───────┘          └───┬───┘
+    │                      │                      │
+    │  GET /api/reports/   │                      │
+    │  {id}/image-by-path  │                      │
+    │  ?path=...           │                      │
+    │─────────────────────>│                      │
+    │                      │                      │
+    │                      │  Download by path    │
+    │                      │─────────────────────>│
+    │                      │                      │
+    │                      │  Image content       │
+    │                      │<─────────────────────│
+    │                      │                      │
+    │  Image stream        │                      │
+    │<─────────────────────│                      │
+    │                      │                      │
+```
+
 **查询参数:**
 
 | 参数 | 类型 | 说明 |
@@ -477,6 +730,35 @@ http://data-service:8001
 #### DELETE /api/reports/{report_id}
 
 删除报告及其关联的所有资源。
+
+**时序图:**
+```
+┌────────┐          ┌──────────────┐          ┌───────┐          ┌───────┐
+│ Client │          │ Data Service │          │ MySQL │          │ MinIO │
+└───┬────┘          └──────┬───────┘          └───┬───┘          └───┬───┘
+    │                      │                      │                  │
+    │  DELETE /api/reports │                      │                  │
+    │  /{report_id}        │                      │                  │
+    │─────────────────────>│                      │                  │
+    │                      │                      │                  │
+    │                      │  Query report        │                  │
+    │                      │─────────────────────>│                  │
+    │                      │                      │                  │
+    │                      │  Query images        │                  │
+    │                      │─────────────────────>│                  │
+    │                      │                      │                  │
+    │                      │  [For each image]    │                  │
+    │                      │  Delete from MinIO   │                  │
+    │                      │─────────────────────────────────────────>│
+    │                      │                      │                  │
+    │                      │  Delete report       │                  │
+    │                      │  (cascade delete)    │                  │
+    │                      │─────────────────────>│                  │
+    │                      │                      │                  │
+    │  { success }         │                      │                  │
+    │<─────────────────────│                      │                  │
+    │                      │                      │                  │
+```
 
 **响应示例:**
 ```json
@@ -506,72 +788,10 @@ http://data-service:8001
     "sign_date": "",
     "approve_date": ""
   },
-  "definitions": {
-    "title": "相关定义",
-    "functional_description": "功能描述...",
-    "assumptions": [
-      {"id": "ASM-01", "description": "假设描述"}
-    ],
-    "terminology": [
-      {"abbreviation": "IVI", "english": "In-Vehicle Infotainment", "chinese": "车载信息娱乐系统"}
-    ]
-  },
-  "assets": {
-    "title": "资产列表",
-    "assets": [
-      {
-        "id": "P001",
-        "name": "SOC",
-        "category": "内部实体",
-        "remarks": "备注",
-        "authenticity": true,
-        "integrity": false,
-        "non_repudiation": false,
-        "confidentiality": false,
-        "availability": true,
-        "authorization": false
-      }
-    ]
-  },
-  "attack_trees": {
-    "title": "攻击树分析",
-    "attack_trees": [
-      {
-        "asset_id": "P001",
-        "asset_name": "SOC",
-        "title": "攻击树1",
-        "image": ""
-      }
-    ]
-  },
-  "tara_results": {
-    "title": "TARA分析结果",
-    "results": [
-      {
-        "asset_id": "P001",
-        "asset_name": "资产名称",
-        "subdomain1": "",
-        "subdomain2": "",
-        "subdomain3": "",
-        "category": "内部实体",
-        "security_attribute": "Authenticity",
-        "stride_model": "S欺骗",
-        "threat_scenario": "威胁场景描述",
-        "attack_path": "攻击路径描述",
-        "wp29_mapping": "",
-        "attack_vector": "本地",
-        "attack_complexity": "低",
-        "privileges_required": "低",
-        "user_interaction": "不需要",
-        "safety_impact": "中等的",
-        "financial_impact": "中等的",
-        "operational_impact": "重大的",
-        "privacy_impact": "可忽略不计的",
-        "security_goal": "",
-        "security_requirement": "安全需求描述"
-      }
-    ]
-  }
+  "definitions": {...},
+  "assets": {...},
+  "attack_trees": {...},
+  "tara_results": {...}
 }
 ```
 
