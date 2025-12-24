@@ -778,6 +778,12 @@ async def list_reports(
         tara_count = db.query(ReportTARAResult).filter(ReportTARAResult.report_id == report.report_id).count()
         attack_trees_count = db.query(ReportAttackTree).filter(ReportAttackTree.report_id == report.report_id).count()
         
+        # 计算高风险项数量（operational_impact 为 "重大的" 或 "严重的"）
+        high_risk_count = db.query(ReportTARAResult).filter(
+            ReportTARAResult.report_id == report.report_id,
+            ReportTARAResult.operational_impact.in_(['重大的', '严重的'])
+        ).count()
+        
         result.append({
             "id": report.report_id,
             "report_id": report.report_id,
@@ -790,7 +796,7 @@ async def list_reports(
             "statistics": {
                 "assets_count": assets_count,
                 "threats_count": tara_count,
-                "high_risk_count": 0,
+                "high_risk_count": high_risk_count,
                 "measures_count": tara_count,
                 "attack_trees_count": attack_trees_count
             }

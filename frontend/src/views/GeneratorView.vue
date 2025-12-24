@@ -590,8 +590,8 @@ function resetAndContinue() {
 
 .upload-zone {
   border: 2px dashed var(--border-color);
-  border-radius: 16px;
-  padding: 48px 24px;
+  border-radius: 12px;
+  padding: 24px 20px;
   text-align: center;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -605,10 +605,10 @@ function resetAndContinue() {
 }
 
 .upload-icon {
-  width: 48px;
-  height: 48px;
+  width: 36px;
+  height: 36px;
   color: var(--text-muted);
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .upload-zone p {
