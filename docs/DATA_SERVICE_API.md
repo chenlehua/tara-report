@@ -439,11 +439,34 @@ http://data-service:8001
 
 **路径参数:**
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| report_id | string | 报告ID |
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| report_id | string | 是 | 报告ID，格式为 RPT-YYYYMMDD-XXXXXXXX |
 
-**响应示例:**
+**请求示例:**
+
+```bash
+curl -X GET "http://data-service:8001/api/v1/reports/RPT-20250115-ABC12345/definitions"
+```
+
+**响应字段说明:**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| title | string | 项目/系统标题 |
+| functional_description | string | 功能描述 |
+| item_boundary_image | string | 项目边界图的MinIO路径，可能为null |
+| system_architecture_image | string | 系统架构图的MinIO路径，可能为null |
+| software_architecture_image | string | 软件架构图的MinIO路径，可能为null |
+| dataflow_image | string | 数据流图的MinIO路径，可能为null |
+| assumptions | array | 假设条件列表 |
+| assumptions[].id | string | 假设条件ID |
+| assumptions[].content | string | 假设条件内容 |
+| terminology | array | 术语表列表 |
+| terminology[].term | string | 术语名称 |
+| terminology[].definition | string | 术语定义 |
+
+**成功响应示例 (200 OK):**
 ```json
 {
   "title": "智能网联汽车网关系统",
@@ -474,6 +497,13 @@ http://data-service:8001
   ]
 }
 ```
+
+**错误响应:**
+
+| 状态码 | 说明 | 响应示例 |
+|--------|------|----------|
+| 404 | 相关定义不存在 | `{"detail": "相关定义不存在"}` |
+| 500 | 服务器内部错误 | `{"detail": "服务器内部错误"}` |
 
 ---
 
@@ -513,11 +543,35 @@ http://data-service:8001
 
 **路径参数:**
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| report_id | string | 报告ID |
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| report_id | string | 是 | 报告ID，格式为 RPT-YYYYMMDD-XXXXXXXX |
 
-**响应示例:**
+**请求示例:**
+
+```bash
+curl -X GET "http://data-service:8001/api/v1/reports/RPT-20250115-ABC12345/assets"
+```
+
+**响应字段说明:**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| title | string | 资产列表标题，格式为 "{项目名称} - 资产列表 Asset List" |
+| dataflow_image | string | 数据流图的MinIO路径，可能为null |
+| assets | array | 资产列表 |
+| assets[].id | string | 资产ID |
+| assets[].name | string | 资产名称 |
+| assets[].category | string | 资产类别（如：数据资产、硬件资产、软件资产等） |
+| assets[].remarks | string | 资产备注说明 |
+| assets[].authenticity | boolean | 真实性安全属性 |
+| assets[].integrity | boolean | 完整性安全属性 |
+| assets[].non_repudiation | boolean | 不可否认性安全属性 |
+| assets[].confidentiality | boolean | 机密性安全属性 |
+| assets[].availability | boolean | 可用性安全属性 |
+| assets[].authorization | boolean | 授权性安全属性 |
+
+**成功响应示例 (200 OK):**
 ```json
 {
   "title": "智能网联汽车网关系统 - 资产列表 Asset List",
@@ -565,20 +619,32 @@ http://data-service:8001
 
 **资产安全属性说明:**
 
-| 属性 | 说明 |
-|------|------|
-| authenticity | 真实性 - 确保数据来源可信 |
-| integrity | 完整性 - 确保数据未被篡改 |
-| non_repudiation | 不可否认性 - 确保操作可追溯 |
-| confidentiality | 机密性 - 确保数据不被泄露 |
-| availability | 可用性 - 确保服务持续可用 |
-| authorization | 授权性 - 确保访问经过授权 |
+| 属性 | 英文名 | 说明 |
+|------|--------|------|
+| authenticity | Authenticity | 真实性 - 确保数据来源可信 |
+| integrity | Integrity | 完整性 - 确保数据未被篡改 |
+| non_repudiation | Non-repudiation | 不可否认性 - 确保操作可追溯 |
+| confidentiality | Confidentiality | 机密性 - 确保数据不被泄露 |
+| availability | Availability | 可用性 - 确保服务持续可用 |
+| authorization | Authorization | 授权性 - 确保访问经过授权 |
+
+**错误响应:**
+
+| 状态码 | 说明 | 响应示例 |
+|--------|------|----------|
+| 404 | 报告不存在 | `{"detail": "报告不存在"}` |
+| 500 | 服务器内部错误 | `{"detail": "服务器内部错误"}` |
+
+**注意事项:**
+- 如果报告不存在资产数据，assets数组将返回空列表 `[]`
+- dataflow_image字段可能为null（如果上传时未提供数据流图）
+- 资产列表按照上传时的顺序返回
 
 ---
 
 #### GET /api/v1/reports/{report_id}/attack-trees
 
-获取报告攻击树列表，包含每个资产对应的攻击树图片。
+获取报告攻击树列表，包含每个资产对应的攻击树图片。攻击树用于可视化展示针对特定资产的潜在攻击路径和威胁场景。
 
 **时序图:**
 ```
@@ -604,11 +670,28 @@ http://data-service:8001
 
 **路径参数:**
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| report_id | string | 报告ID |
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| report_id | string | 是 | 报告ID，格式为 RPT-YYYYMMDD-XXXXXXXX |
 
-**响应示例:**
+**请求示例:**
+
+```bash
+curl -X GET "http://data-service:8001/api/v1/reports/RPT-20250115-ABC12345/attack-trees"
+```
+
+**响应字段说明:**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| title | string | 攻击树分析标题，固定为 "攻击树分析 Attack Tree Analysis" |
+| attack_trees | array | 攻击树列表，按sort_order排序 |
+| attack_trees[].asset_id | string | 关联的资产ID |
+| attack_trees[].asset_name | string | 关联的资产名称 |
+| attack_trees[].title | string | 攻击树标题 |
+| attack_trees[].image | string | 攻击树图片的MinIO路径 |
+
+**成功响应示例 (200 OK):**
 ```json
 {
   "title": "攻击树分析 Attack Tree Analysis",
@@ -635,11 +718,32 @@ http://data-service:8001
 }
 ```
 
+**空数据响应示例 (200 OK):**
+```json
+{
+  "title": "攻击树分析 Attack Tree Analysis",
+  "attack_trees": []
+}
+```
+
+**错误响应:**
+
+| 状态码 | 说明 | 响应示例 |
+|--------|------|----------|
+| 404 | 报告不存在 | `{"detail": "报告不存在"}` |
+| 500 | 服务器内部错误 | `{"detail": "服务器内部错误"}` |
+
+**注意事项:**
+- 攻击树列表按照 sort_order 字段升序排列，即按上传时的顺序返回
+- 如果没有攻击树数据，attack_trees 数组将返回空列表 `[]`
+- image 字段存储的是MinIO对象路径，可通过 `/api/v1/reports/{report_id}/image-by-path?path={image}` 获取实际图片
+- 每个攻击树对应一个资产，用于分析该资产可能面临的攻击威胁
+
 ---
 
 #### GET /api/v1/reports/{report_id}/tara-results
 
-获取TARA（威胁分析和风险评估）分析结果，包含完整的威胁场景、攻击路径和安全措施。
+获取TARA（Threat Analysis and Risk Assessment，威胁分析和风险评估）分析结果，包含完整的威胁场景、攻击路径和安全措施。这是TARA报告中最核心的数据部分。
 
 **时序图:**
 ```
@@ -665,11 +769,61 @@ http://data-service:8001
 
 **路径参数:**
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| report_id | string | 报告ID |
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| report_id | string | 是 | 报告ID，格式为 RPT-YYYYMMDD-XXXXXXXX |
 
-**响应示例:**
+**请求示例:**
+
+```bash
+curl -X GET "http://data-service:8001/api/v1/reports/RPT-20250115-ABC12345/tara-results"
+```
+
+**响应字段说明:**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| title | string | TARA分析结果标题，固定为 "TARA分析结果 TARA Analysis Results" |
+| results | array | TARA分析结果列表，按sort_order排序 |
+
+**results数组元素字段说明:**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| asset_id | string | 资产ID |
+| asset_name | string | 资产名称 |
+| subdomain1 | string | 子域层级1（系统级） |
+| subdomain2 | string | 子域层级2（模块级） |
+| subdomain3 | string | 子域层级3（组件级） |
+| category | string | 资产类别（如：数据资产、硬件资产、软件资产） |
+| security_attribute | string | 安全属性（机密性/完整性/可用性/真实性/不可否认性/授权性） |
+| stride_model | string | STRIDE威胁模型分类（见下方说明表） |
+| threat_scenario | string | 威胁场景描述 |
+| attack_path | string | 攻击路径描述 |
+| wp29_mapping | string | WP.29法规条款映射 |
+| attack_vector | string | 攻击向量（网络/相邻网络/本地/物理） |
+| attack_complexity | string | 攻击复杂度（低/高） |
+| privileges_required | string | 所需权限（无/低/高） |
+| user_interaction | string | 用户交互（无/需要） |
+| safety_impact | string | 安全影响（无/低/中/高/严重） |
+| financial_impact | string | 财务影响（无/低/中/高/严重） |
+| operational_impact | string | 运营影响（无/低/中/高/严重） |
+| privacy_impact | string | 隐私影响（无/低/中/高/严重） |
+| security_goal | string | 安全目标 |
+| security_requirement | string | 安全需求/对策 |
+
+**STRIDE威胁模型分类说明:**
+
+| STRIDE类型 | 英文全称 | 中文说明 |
+|------------|----------|----------|
+| 欺骗 | Spoofing | 身份欺骗，冒充其他用户或系统 |
+| 篡改 | Tampering | 恶意修改数据或代码 |
+| 否认 | Repudiation | 否认执行过某操作 |
+| 信息泄露 | Information Disclosure | 未授权访问敏感信息 |
+| 拒绝服务 | Denial of Service | 使系统或服务不可用 |
+| 权限提升 | Elevation of Privilege | 获取未授权的访问权限 |
+
+**成功响应示例 (200 OK):**
 ```json
 {
   "title": "TARA分析结果 TARA Analysis Results",
@@ -724,29 +878,36 @@ http://data-service:8001
 }
 ```
 
-**TARA结果字段说明:**
+**空数据响应示例 (200 OK):**
+```json
+{
+  "title": "TARA分析结果 TARA Analysis Results",
+  "results": []
+}
+```
 
-| 字段 | 说明 |
+**错误响应:**
+
+| 状态码 | 说明 | 响应示例 |
+|--------|------|----------|
+| 404 | 报告不存在 | `{"detail": "报告不存在"}` |
+| 500 | 服务器内部错误 | `{"detail": "服务器内部错误"}` |
+
+**影响等级说明:**
+
+| 等级 | 说明 |
 |------|------|
-| asset_id | 资产ID |
-| asset_name | 资产名称 |
-| subdomain1/2/3 | 子域层级（系统/模块/组件） |
-| category | 资产类别 |
-| security_attribute | 安全属性（机密性/完整性/可用性等） |
-| stride_model | STRIDE威胁模型分类 |
-| threat_scenario | 威胁场景描述 |
-| attack_path | 攻击路径 |
-| wp29_mapping | WP.29法规映射 |
-| attack_vector | 攻击向量（网络/相邻网络/本地/物理） |
-| attack_complexity | 攻击复杂度（低/高） |
-| privileges_required | 所需权限（无/低/高） |
-| user_interaction | 用户交互（无/需要） |
-| safety_impact | 安全影响（无/低/中/高/严重） |
-| financial_impact | 财务影响（无/低/中/高/严重） |
-| operational_impact | 运营影响（无/低/中/高/严重） |
-| privacy_impact | 隐私影响（无/低/中/高/严重） |
-| security_goal | 安全目标 |
-| security_requirement | 安全需求/对策 |
+| 无 | 无影响 |
+| 低 | 轻微影响，可忽略 |
+| 中 | 中等影响，需要关注 |
+| 高 | 严重影响，需要优先处理 |
+| 严重 | 关键影响，需要立即处理 |
+
+**注意事项:**
+- TARA结果列表按照 sort_order 字段升序排列
+- 如果没有TARA分析结果，results 数组将返回空列表 `[]`
+- 每条TARA结果对应一个具体的威胁场景分析
+- WP.29映射字段用于关联联合国WP.29法规要求
 
 ---
 
