@@ -558,7 +558,7 @@ function getImageUrl(imagePath?: string): string {
     // 尝试从文件名中提取图片ID
     const match = filename.match(/^(IMG-[a-f0-9]+)/i)
     if (match) {
-      return `/api/images/${match[1]}`
+      return `/api/v1/images/${match[1]}`
     }
   }
   return imagePath
