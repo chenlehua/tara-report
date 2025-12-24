@@ -31,11 +31,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Copy service files
 COPY data-service/pyproject.toml ./
-COPY data-service/main.py ./
 COPY data-service/__init__.py ./
-COPY data-service/database.py ./
-COPY data-service/models.py ./
-COPY data-service/minio_client.py ./
+COPY data-service/app ./app
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -e .
@@ -44,4 +41,4 @@ RUN pip install --no-cache-dir -e .
 EXPOSE 8001
 
 # Run the application
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]

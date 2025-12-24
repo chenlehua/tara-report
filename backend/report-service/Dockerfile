@@ -33,13 +33,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Copy service files
 COPY report-service/pyproject.toml ./
-COPY report-service/main.py ./
 COPY report-service/__init__.py ./
-COPY report-service/database.py ./
-COPY report-service/models.py ./
-COPY report-service/minio_client.py ./
-COPY report-service/tara_excel_generator.py ./
-COPY report-service/tara_pdf_generator.py ./
+COPY report-service/app ./app
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -e .
@@ -48,4 +43,4 @@ RUN pip install --no-cache-dir -e .
 EXPOSE 8002
 
 # Run the application
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8002"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8002"]

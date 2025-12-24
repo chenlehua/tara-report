@@ -1,14 +1,15 @@
 """
-数据库模型定义
+Report database models
 """
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import relationship
-from database import Base
+
+from app.common.database.mysql import Base
 
 
 class Report(Base):
-    """报告主表"""
+    """Report main table"""
     __tablename__ = "reports"
     
     id = Column(Integer, primary_key=True, index=True)
@@ -17,7 +18,7 @@ class Report(Base):
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
     
-    # 关联
+    # Relationships
     cover = relationship("ReportCover", back_populates="report", uselist=False, cascade="all, delete-orphan")
     definitions = relationship("ReportDefinitions", back_populates="report", uselist=False, cascade="all, delete-orphan")
     assets = relationship("ReportAsset", back_populates="report", cascade="all, delete-orphan")
@@ -28,7 +29,7 @@ class Report(Base):
 
 
 class ReportCover(Base):
-    """报告封面信息"""
+    """Report cover information"""
     __tablename__ = "report_covers"
     
     id = Column(Integer, primary_key=True, index=True)
@@ -49,7 +50,7 @@ class ReportCover(Base):
 
 
 class ReportDefinitions(Base):
-    """报告相关定义"""
+    """Report definitions"""
     __tablename__ = "report_definitions"
     
     id = Column(Integer, primary_key=True, index=True)
@@ -68,7 +69,7 @@ class ReportDefinitions(Base):
 
 
 class ReportAsset(Base):
-    """报告资产"""
+    """Report asset"""
     __tablename__ = "report_assets"
     
     id = Column(Integer, primary_key=True, index=True)
@@ -89,7 +90,7 @@ class ReportAsset(Base):
 
 
 class ReportAttackTree(Base):
-    """报告攻击树"""
+    """Report attack tree"""
     __tablename__ = "report_attack_trees"
     
     id = Column(Integer, primary_key=True, index=True)
@@ -105,13 +106,13 @@ class ReportAttackTree(Base):
 
 
 class ReportTARAResult(Base):
-    """TARA分析结果"""
+    """TARA analysis result"""
     __tablename__ = "report_tara_results"
     
     id = Column(Integer, primary_key=True, index=True)
     report_id = Column(String(50), ForeignKey("reports.report_id", ondelete="CASCADE"), nullable=False)
     
-    # 资产识别
+    # Asset identification
     asset_id = Column(String(50), comment="资产ID")
     asset_name = Column(String(200), comment="资产名称")
     subdomain1 = Column(String(100), comment="子领域一")
@@ -119,26 +120,26 @@ class ReportTARAResult(Base):
     subdomain3 = Column(String(100), comment="子领域三")
     category = Column(String(100), comment="分类")
     
-    # 威胁场景
+    # Threat scenario
     security_attribute = Column(String(100), comment="安全属性")
     stride_model = Column(String(50), comment="STRIDE模型")
     threat_scenario = Column(Text, comment="潜在威胁场景")
     attack_path = Column(Text, comment="攻击路径")
     wp29_mapping = Column(String(200), comment="WP29威胁映射")
     
-    # 威胁分析
+    # Threat analysis
     attack_vector = Column(String(50), comment="攻击向量")
     attack_complexity = Column(String(50), comment="攻击复杂度")
     privileges_required = Column(String(50), comment="权限要求")
     user_interaction = Column(String(50), comment="用户交互")
     
-    # 影响分析
+    # Impact analysis
     safety_impact = Column(String(50), comment="安全影响")
     financial_impact = Column(String(50), comment="经济影响")
     operational_impact = Column(String(50), comment="操作影响")
     privacy_impact = Column(String(50), comment="隐私影响")
     
-    # 安全需求
+    # Security requirements
     security_goal = Column(Text, comment="安全目标")
     security_requirement = Column(Text, comment="安全需求")
     
@@ -148,7 +149,7 @@ class ReportTARAResult(Base):
 
 
 class ReportImage(Base):
-    """报告图片"""
+    """Report image"""
     __tablename__ = "report_images"
     
     id = Column(Integer, primary_key=True, index=True)
@@ -167,7 +168,7 @@ class ReportImage(Base):
 
 
 class GeneratedReport(Base):
-    """已生成的报告文件"""
+    """Generated report file"""
     __tablename__ = "generated_reports"
     
     id = Column(Integer, primary_key=True, index=True)

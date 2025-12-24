@@ -1,39 +1,31 @@
 """
-MinIO 客户端配置
+MinIO client configuration
 """
-import os
-from minio import Minio
-from minio.error import S3Error
 import io
 from typing import Optional, BinaryIO
 from datetime import timedelta
 
-# MinIO 配置
-MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "minio:9000")
-MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
-MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minioadmin123")
-MINIO_SECURE = os.getenv("MINIO_SECURE", "false").lower() == "true"
+from minio import Minio
+from minio.error import S3Error
 
-# 桶名称
-BUCKET_IMAGES = "tara-images"
-BUCKET_REPORTS = "tara-reports"
+from app.common.config.settings import settings
 
 
 class MinIOClient:
-    """MinIO 客户端封装"""
+    """MinIO client wrapper"""
     
     def __init__(self):
         self.client = Minio(
-            MINIO_ENDPOINT,
-            access_key=MINIO_ACCESS_KEY,
-            secret_key=MINIO_SECRET_KEY,
-            secure=MINIO_SECURE
+            settings.MINIO_ENDPOINT,
+            access_key=settings.MINIO_ACCESS_KEY,
+            secret_key=settings.MINIO_SECRET_KEY,
+            secure=settings.MINIO_SECURE
         )
         self._ensure_buckets()
     
     def _ensure_buckets(self):
-        """确保桶存在"""
-        for bucket in [BUCKET_IMAGES, BUCKET_REPORTS]:
+        """Ensure buckets exist"""
+        for bucket in [settings.BUCKET_IMAGES, settings.BUCKET_REPORTS]:
             try:
                 if not self.client.bucket_exists(bucket):
                     self.client.make_bucket(bucket)
@@ -50,17 +42,17 @@ class MinIOClient:
         content_type: str = "application/octet-stream"
     ) -> str:
         """
-        上传文件到 MinIO
+        Upload file to MinIO
         
         Args:
-            bucket: 桶名称
-            object_name: 对象名称（路径）
-            data: 文件数据流
-            length: 文件大小
-            content_type: 内容类型
+            bucket: Bucket name
+            object_name: Object name (path)
+            data: File data stream
+            length: File size
+            content_type: Content type
         
         Returns:
-            str: MinIO 对象路径
+            str: MinIO object path
         """
         try:
             self.client.put_object(
@@ -82,18 +74,19 @@ class MinIOClient:
         content_type: str = "application/octet-stream"
     ) -> str:
         """
-        上传字节数据到 MinIO
+        Upload bytes data to MinIO
         """
         data_stream = io.BytesIO(data)
         return self.upload_file(bucket, object_name, data_stream, len(data), content_type)
     
     def download_file(self, bucket: str, object_name: str) -> bytes:
         """
-        从 MinIO 下载文件
+        Download file from MinIO
         
         Returns:
-            bytes: 文件内容
+            bytes: File content
         """
+        response = None
         try:
             response = self.client.get_object(bucket, object_name)
             return response.read()
@@ -111,7 +104,7 @@ class MinIOClient:
         expires: timedelta = timedelta(hours=1)
     ) -> str:
         """
-        获取预签名URL
+        Get presigned URL
         """
         try:
             return self.client.presigned_get_object(bucket, object_name, expires=expires)
@@ -120,7 +113,7 @@ class MinIOClient:
     
     def delete_file(self, bucket: str, object_name: str) -> bool:
         """
-        删除文件
+        Delete file
         """
         try:
             self.client.remove_object(bucket, object_name)
@@ -131,7 +124,7 @@ class MinIOClient:
     
     def file_exists(self, bucket: str, object_name: str) -> bool:
         """
-        检查文件是否存在
+        Check if file exists
         """
         try:
             self.client.stat_object(bucket, object_name)
@@ -140,12 +133,12 @@ class MinIOClient:
             return False
 
 
-# 全局客户端实例
+# Global client instance
 _minio_client: Optional[MinIOClient] = None
 
 
 def get_minio_client() -> MinIOClient:
-    """获取 MinIO 客户端实例"""
+    """Get MinIO client instance"""
     global _minio_client
     if _minio_client is None:
         _minio_client = MinIOClient()
