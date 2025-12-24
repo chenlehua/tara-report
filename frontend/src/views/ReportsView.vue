@@ -133,6 +133,24 @@
               </a>
             </div>
           </div>
+
+          <!-- 删除按钮 -->
+          <button 
+            class="btn btn-danger-outline" 
+            @click="handleDelete(report.id, report.name)"
+            :disabled="deletingId === report.id"
+          >
+            <svg v-if="deletingId !== report.id" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+              <line x1="10" y1="11" x2="10" y2="17"/>
+              <line x1="14" y1="11" x2="14" y2="17"/>
+            </svg>
+            <svg v-else class="animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <circle cx="12" cy="12" r="10" stroke-opacity="0.25"/>
+              <path d="M12 2a10 10 0 0110 10" stroke-linecap="round"/>
+            </svg>
+          </button>
         </div>
       </div>
     </div>
@@ -141,13 +159,14 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
-import { getReports, getDownloadUrl, getPdfDownloadUrl } from '@/api'
+import { getReports, getDownloadUrl, getPdfDownloadUrl, deleteReport } from '@/api'
 
 const isLoading = ref(true)
 const reports = ref([])
 const activeDropdown = ref(null)
+const deletingId = ref(null)
 
-onMounted(async () => {
+async function loadReports() {
   try {
     const result = await getReports()
     if (result.success) {
@@ -158,6 +177,10 @@ onMounted(async () => {
   } finally {
     isLoading.value = false
   }
+}
+
+onMounted(async () => {
+  await loadReports()
   
   // 点击外部关闭下拉菜单
   document.addEventListener('click', handleClickOutside)
@@ -192,9 +215,22 @@ function formatDate(dateStr) {
   })
 }
 
-function handleDelete(reportId) {
-  if (confirm('确定要删除这份报告吗？')) {
-    // 调用删除API
+async function handleDelete(reportId, reportName) {
+  if (!confirm(`确定要删除报告「${reportName}」吗？\n\n此操作将永久删除该报告及其所有关联文件，无法恢复。`)) {
+    return
+  }
+  
+  deletingId.value = reportId
+  
+  try {
+    await deleteReport(reportId)
+    // 从列表中移除已删除的报告
+    reports.value = reports.value.filter(r => r.id !== reportId)
+  } catch (error) {
+    console.error('删除报告失败:', error)
+    alert('删除报告失败: ' + (error.response?.data?.detail || error.message))
+  } finally {
+    deletingId.value = null
   }
 }
 </script>
@@ -380,6 +416,24 @@ function handleDelete(reportId) {
 .report-actions .btn svg {
   width: 16px;
   height: 16px;
+}
+
+.btn-danger-outline {
+  background: transparent;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+  padding: 10px 12px;
+  flex: 0 0 auto;
+}
+
+.btn-danger-outline:hover {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+.btn-danger-outline:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* 下载下拉菜单 */
