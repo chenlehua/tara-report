@@ -2,7 +2,7 @@ import axios from 'axios'
 import type { ReportInfo, PreviewData, ApiResponse } from '@/types'
 
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: '/api/v1',
   timeout: 120000, // 增加超时时间到2分钟
   headers: {
     'Content-Type': 'application/json'
@@ -93,12 +93,12 @@ export async function downloadPdfReport(reportId: string): Promise<Blob> {
 
 // 获取Excel下载URL
 export function getDownloadUrl(reportId: string): string {
-  return `/api/reports/${reportId}/download`
+  return `/api/v1/reports/${reportId}/download`
 }
 
 // 获取PDF下载URL
 export function getPdfDownloadUrl(reportId: string): string {
-  return `/api/reports/${reportId}/download/pdf`
+  return `/api/v1/reports/${reportId}/download/pdf`
 }
 
 // 生成PDF报告
@@ -116,7 +116,7 @@ export async function deleteReport(reportId: string): Promise<void> {
 export async function uploadImage(file: File, type: string): Promise<{ filename: string; url: string }> {
   const formData = new FormData()
   formData.append('file', file)
-  formData.append('type', type)
+  formData.append('image_type', type)
   
   const response = await api.post('/images/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
@@ -126,7 +126,7 @@ export async function uploadImage(file: File, type: string): Promise<{ filename:
 
 // 获取图片URL
 export function getImageUrl(filename: string): string {
-  return `/api/images/${filename}`
+  return `/api/v1/images/${filename}`
 }
 
 export default api

@@ -1,8 +1,8 @@
 import axios from 'axios'
 
 const api = axios.create({
-  baseURL: '/api',
-  timeout: 30000,
+  baseURL: '/api/v1',
+  timeout: 120000,
   headers: {
     'Content-Type': 'application/json'
   }
@@ -112,12 +112,12 @@ export async function getReport(reportId) {
 
 // 下载报告 (Excel)
 export function getDownloadUrl(reportId) {
-  return `/api/reports/${reportId}/download`
+  return `/api/v1/reports/${reportId}/download`
 }
 
 // 下载PDF报告
 export function getPdfDownloadUrl(reportId) {
-  return `/api/reports/${reportId}/download/pdf`
+  return `/api/v1/reports/${reportId}/download/pdf`
 }
 
 // 生成PDF报告
@@ -132,7 +132,7 @@ export async function deleteReport(reportId) {
 
 // 获取图片URL
 export function getImageUrl(imageId) {
-  return `/api/images/${imageId}`
+  return `/api/v1/images/${imageId}`
 }
 
 // 健康检查

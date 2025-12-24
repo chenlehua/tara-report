@@ -50,15 +50,15 @@ services:
     networks:
       - tara-network
 
-  # 数据服务 - 负责数据上传、解析和存储
-  data-service:
+  # 后端 API 服务 - 统一的 TARA API
+  backend:
     build:
       context: ./backend
-      dockerfile: data-service/Dockerfile
-    container_name: tara-data-service
+      dockerfile: Dockerfile
+    container_name: tara-backend
     restart: unless-stopped
     ports:
-      - "8001:8001"
+      - "8000:8000"
     environment:
       - PYTHONUNBUFFERED=1
       - MYSQL_HOST=mysql
@@ -70,51 +70,16 @@ services:
       - MINIO_ACCESS_KEY=minioadmin
       - MINIO_SECRET_KEY=minioadmin123
       - MINIO_SECURE=false
-      - REPORT_SERVICE_URL=http://report-service:8002
+    volumes:
+      - backend_uploads:/app/uploads
+      - backend_reports:/app/reports
     depends_on:
       mysql:
         condition: service_healthy
       minio:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/api/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    networks:
-      - tara-network
-
-  # 报告服务 - 负责报告生成和下载
-  report-service:
-    build:
-      context: ./backend
-      dockerfile: report-service/Dockerfile
-    container_name: tara-report-service
-    restart: unless-stopped
-    ports:
-      - "8002:8002"
-    environment:
-      - PYTHONUNBUFFERED=1
-      - MYSQL_HOST=mysql
-      - MYSQL_PORT=3306
-      - MYSQL_USER=tara
-      - MYSQL_PASSWORD=tara123456
-      - MYSQL_DATABASE=tara_db
-      - MINIO_ENDPOINT=minio:9000
-      - MINIO_ACCESS_KEY=minioadmin
-      - MINIO_SECRET_KEY=minioadmin123
-      - MINIO_SECURE=false
-      - DATA_SERVICE_URL=http://data-service:8001
-    depends_on:
-      data-service:
-        condition: service_healthy
-      mysql:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8002/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -132,8 +97,7 @@ services:
     ports:
       - "30031:30031"
     depends_on:
-      - data-service
-      - report-service
+      - backend
     networks:
       - tara-network
 
@@ -141,6 +105,10 @@ volumes:
   mysql_data:
     driver: local
   minio_data:
+    driver: local
+  backend_uploads:
+    driver: local
+  backend_reports:
     driver: local
 
 networks:

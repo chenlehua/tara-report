@@ -36,7 +36,7 @@ sudo apt-get install fonts-noto-cjk
 ### 手动安装字体
 如果系统字体不可用，可以将中文字体文件（.ttf/.ttc）放到以下目录：
 ```
-backend/tara_api/fonts/
+backend/app/generators/fonts/
 ```
 
 推荐的开源中文字体：
@@ -53,7 +53,7 @@ backend/tara_api/fonts/
 pip install -e .
 
 # 或者使用pip安装依赖
-pip install fastapi uvicorn openpyxl pillow python-multipart pydantic aiofiles
+pip install fastapi uvicorn openpyxl pillow python-multipart pydantic aiofiles reportlab
 ```
 
 ### 启动服务
@@ -63,10 +63,10 @@ pip install fastapi uvicorn openpyxl pillow python-multipart pydantic aiofiles
 tara-api
 
 # 方式2: 使用uvicorn
-uvicorn tara_api.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 # 方式3: 直接运行
-python -m tara_api.main
+python -m app.main
 ```
 
 ### API文档
@@ -77,9 +77,11 @@ python -m tara_api.main
 
 ## API端点
 
+所有API端点都使用 `/api/v1` 前缀。
+
 ### 图片上传
 ```
-POST /api/images/upload
+POST /api/v1/images/upload
 ```
 上传图片，支持类型：
 - `item_boundary`: 项目边界图
@@ -88,9 +90,14 @@ POST /api/images/upload
 - `dataflow`: 数据流图
 - `attack_tree`: 攻击树图
 
+### 获取图片
+```
+GET /api/v1/images/{image_id}
+```
+
 ### 生成报告
 ```
-POST /api/reports/generate
+POST /api/v1/reports/generate
 ```
 参数：
 - `json_file`: JSON数据文件（可选）
@@ -101,24 +108,50 @@ POST /api/reports/generate
 - `dataflow_image`: 数据流图片ID
 - `attack_tree_images`: 攻击树图片ID列表（逗号分隔）
 
+### 批量上传生成
+```
+POST /api/v1/upload/batch
+```
+一键上传JSON和图片文件，自动生成报告。
+
 ### 获取报告列表
 ```
-GET /api/reports
+GET /api/v1/reports
 ```
 
 ### 获取报告详情
 ```
-GET /api/reports/{report_id}
+GET /api/v1/reports/{report_id}
 ```
 
-### 下载报告
+### 获取报告预览
 ```
-GET /api/reports/{report_id}/download
+GET /api/v1/reports/{report_id}/preview
+```
+
+### 下载Excel报告
+```
+GET /api/v1/reports/{report_id}/download
+```
+
+### 下载PDF报告
+```
+GET /api/v1/reports/{report_id}/download/pdf
+```
+
+### 生成PDF
+```
+POST /api/v1/reports/{report_id}/generate-pdf
 ```
 
 ### 删除报告
 ```
-DELETE /api/reports/{report_id}
+DELETE /api/v1/reports/{report_id}
+```
+
+### 健康检查
+```
+GET /api/v1/health
 ```
 
 ## 输入数据格式
@@ -194,18 +227,47 @@ DELETE /api/reports/{report_id}
 
 ```
 backend/
-├── pyproject.toml          # 项目配置
-├── README.md               # 说明文档
-├── tara_api/
+├── pyproject.toml              # 项目配置
+├── Dockerfile                  # Docker构建文件
+├── README.md                   # 说明文档
+├── app/
 │   ├── __init__.py
-│   ├── main.py             # FastAPI应用
-│   ├── models.py           # Pydantic数据模型
-│   ├── tara_excel_generator.py  # Excel生成器
-│   ├── tara_pdf_generator.py    # PDF生成器（支持中文）
-│   └── fonts/              # 自定义字体目录（可选）
-├── uploads/                # 上传文件目录
-│   └── images/             # 图片存储
-└── reports/                # 生成的报告
+│   ├── main.py                 # FastAPI应用入口
+│   ├── config.py               # 配置入口
+│   ├── api/
+│   │   ├── __init__.py
+│   │   └── v1/
+│   │       ├── __init__.py
+│   │       ├── router.py       # API路由器
+│   │       └── endpoints/      # API端点
+│   │           ├── images.py   # 图片管理
+│   │           ├── reports.py  # 报告管理
+│   │           ├── upload.py   # 批量上传
+│   │           └── health.py   # 健康检查
+│   ├── common/
+│   │   ├── __init__.py
+│   │   ├── config/
+│   │   │   └── settings.py     # 应用配置
+│   │   ├── constants/
+│   │   │   └── enums.py        # 枚举常量
+│   │   ├── database/
+│   │   │   ├── mysql.py        # MySQL配置
+│   │   │   └── minio.py        # MinIO配置
+│   │   ├── models/
+│   │   │   └── report.py       # SQLAlchemy ORM模型
+│   │   └── schemas/
+│   │       └── report.py       # Pydantic数据模型
+│   ├── generators/
+│   │   ├── __init__.py
+│   │   ├── excel_generator.py  # Excel报告生成器
+│   │   └── pdf_generator.py    # PDF报告生成器
+│   ├── repositories/           # 数据仓库层
+│   │   └── __init__.py
+│   └── services/               # 业务服务层
+│       └── __init__.py
+├── uploads/                    # 上传文件目录
+│   └── images/                 # 图片存储
+└── reports/                    # 生成的报告
 ```
 
 ## 开发
@@ -218,7 +280,20 @@ pip install -e ".[dev]"
 pytest
 
 # 代码格式化
-black tara_api/
+black app/
+```
+
+## Docker 部署
+
+```bash
+# 使用 docker-compose 启动所有服务
+docker-compose up -d
+
+# 仅构建后端服务
+docker build -t tara-backend ./backend
+
+# 运行后端容器
+docker run -p 8000:8000 tara-backend
 ```
 
 ## License
