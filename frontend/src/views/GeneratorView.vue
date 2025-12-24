@@ -590,12 +590,12 @@ function resetAndContinue() {
 
 .upload-zone {
   border: 2px dashed var(--border-color);
-  border-radius: 16px;
-  padding: 48px 24px;
+  border-radius: 10px;
+  padding: 16px;
   text-align: center;
   cursor: pointer;
   transition: all 0.3s ease;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .upload-zone:hover,
@@ -605,15 +605,16 @@ function resetAndContinue() {
 }
 
 .upload-icon {
-  width: 48px;
-  height: 48px;
+  width: 28px;
+  height: 28px;
   color: var(--text-muted);
-  margin-bottom: 16px;
+  margin-bottom: 8px;
 }
 
 .upload-zone p {
   color: var(--text-secondary);
-  margin-bottom: 8px;
+  margin-bottom: 4px;
+  font-size: 14px;
 }
 
 .upload-zone .file-selected {

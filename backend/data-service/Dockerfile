@@ -29,13 +29,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy shared modules
-COPY shared/ ./shared/
-
 # Copy service files
 COPY data-service/pyproject.toml ./
 COPY data-service/main.py ./
 COPY data-service/__init__.py ./
+COPY data-service/database.py ./
+COPY data-service/models.py ./
+COPY data-service/minio_client.py ./
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -e .

@@ -3,7 +3,6 @@
 负责上传JSON和图片、生成报告ID、保存数据到MySQL和MinIO
 """
 import os
-import sys
 import json
 import uuid
 import httpx
@@ -20,15 +19,12 @@ import io
 # 报告服务地址
 REPORT_SERVICE_URL = os.getenv("REPORT_SERVICE_URL", "http://report-service:8002")
 
-# 添加共享模块路径
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from shared.database import get_db, init_db, engine, Base
-from shared.models import (
+from database import get_db, init_db, engine, Base
+from models import (
     Report, ReportCover, ReportDefinitions, ReportAsset,
     ReportAttackTree, ReportTARAResult, ReportImage
 )
-from shared.minio_client import get_minio_client, BUCKET_IMAGES
+from minio_client import get_minio_client, BUCKET_IMAGES
 
 # 创建FastAPI应用
 app = FastAPI(
@@ -422,152 +418,6 @@ async def upload_report_data(
     }
 
 
-@app.get("/api/reports/{report_id}")
-async def get_report_info(report_id: str, db: Session = Depends(get_db)):
-    """获取报告完整信息（用于预览）"""
-    report = db.query(Report).filter(Report.report_id == report_id).first()
-    if not report:
-        raise HTTPException(status_code=404, detail="报告不存在")
-    
-    # 获取封面信息
-    cover = db.query(ReportCover).filter(ReportCover.report_id == report_id).first()
-    
-    # 获取定义信息
-    definitions = db.query(ReportDefinitions).filter(ReportDefinitions.report_id == report_id).first()
-    
-    # 获取资产列表
-    assets = db.query(ReportAsset).filter(ReportAsset.report_id == report_id).all()
-    
-    # 获取攻击树
-    attack_trees = db.query(ReportAttackTree).filter(
-        ReportAttackTree.report_id == report_id
-    ).order_by(ReportAttackTree.sort_order).all()
-    
-    # 获取TARA结果
-    tara_results = db.query(ReportTARAResult).filter(
-        ReportTARAResult.report_id == report_id
-    ).order_by(ReportTARAResult.sort_order).all()
-    
-    # 构建图片URL
-    def build_image_url(minio_path):
-        if not minio_path:
-            return None
-        return f"/api/reports/{report_id}/image-by-path?path={minio_path}"
-    
-    # 构建资产列表
-    assets_list = [
-        {
-            "id": asset.asset_id,
-            "name": asset.name,
-            "category": asset.category,
-            "remarks": asset.remarks,
-            "authenticity": asset.authenticity,
-            "integrity": asset.integrity,
-            "non_repudiation": asset.non_repudiation,
-            "confidentiality": asset.confidentiality,
-            "availability": asset.availability,
-            "authorization": asset.authorization
-        }
-        for asset in assets
-    ]
-    
-    # 构建攻击树列表
-    attack_trees_list = [
-        {
-            "asset_id": tree.asset_id,
-            "asset_name": tree.asset_name,
-            "title": tree.title,
-            "image": tree.image,
-            "image_url": build_image_url(tree.image)
-        }
-        for tree in attack_trees
-    ]
-    
-    # 构建TARA结果列表
-    tara_results_list = [
-        {
-            "asset_id": r.asset_id,
-            "asset_name": r.asset_name,
-            "subdomain1": r.subdomain1,
-            "subdomain2": r.subdomain2,
-            "subdomain3": r.subdomain3,
-            "category": r.category,
-            "security_attribute": r.security_attribute,
-            "stride_model": r.stride_model,
-            "threat_scenario": r.threat_scenario,
-            "attack_path": r.attack_path,
-            "wp29_mapping": r.wp29_mapping,
-            "attack_vector": r.attack_vector,
-            "attack_complexity": r.attack_complexity,
-            "privileges_required": r.privileges_required,
-            "user_interaction": r.user_interaction,
-            "safety_impact": r.safety_impact,
-            "financial_impact": r.financial_impact,
-            "operational_impact": r.operational_impact,
-            "privacy_impact": r.privacy_impact,
-            "security_goal": r.security_goal,
-            "security_requirement": r.security_requirement
-        }
-        for r in tara_results
-    ]
-    
-    # 统计信息
-    statistics = {
-        'assets_count': len(assets_list),
-        'threats_count': len(tara_results_list),
-        'high_risk_count': sum(1 for r in tara_results_list if r.get('operational_impact') in ['重大的', '严重的']),
-        'measures_count': len(tara_results_list),
-        'attack_trees_count': len(attack_trees_list)
-    }
-    
-    # 返回格式与重构前保持一致
-    return {
-        "id": report.report_id,
-        "report_id": report.report_id,
-        "name": cover.report_title if cover else "TARA报告",
-        "project_name": cover.project_name if cover else "",
-        "status": report.status,
-        "created_at": report.created_at.isoformat(),
-        "updated_at": report.updated_at.isoformat() if report.updated_at else None,
-        "file_path": "",
-        "statistics": statistics,
-        "cover": {
-            "report_title": cover.report_title if cover else "",
-            "report_title_en": cover.report_title_en if cover else "",
-            "project_name": cover.project_name if cover else "",
-            "data_level": cover.data_level if cover else "",
-            "document_number": cover.document_number if cover else "",
-            "version": cover.version if cover else "",
-            "author_date": cover.author_date if cover else "",
-            "review_date": cover.review_date if cover else "",
-            "sign_date": cover.sign_date if cover else "",
-            "approve_date": cover.approve_date if cover else ""
-        } if cover else {},
-        "definitions": {
-            "title": definitions.title if definitions else "",
-            "functional_description": definitions.functional_description if definitions else "",
-            "item_boundary_image": build_image_url(definitions.item_boundary_image) if definitions else None,
-            "system_architecture_image": build_image_url(definitions.system_architecture_image) if definitions else None,
-            "software_architecture_image": build_image_url(definitions.software_architecture_image) if definitions else None,
-            "assumptions": definitions.assumptions if definitions else [],
-            "terminology": definitions.terminology if definitions else []
-        } if definitions else {},
-        "assets": {
-            "title": "资产列表",
-            "assets": assets_list,
-            "dataflow_image": build_image_url(definitions.dataflow_image) if definitions and definitions.dataflow_image else None
-        },
-        "attack_trees": {
-            "title": "攻击树分析",
-            "attack_trees": attack_trees_list
-        },
-        "tara_results": {
-            "title": "TARA分析结果",
-            "results": tara_results_list
-        }
-    }
-
-
 @app.get("/api/reports/{report_id}/cover")
 async def get_report_cover(report_id: str, db: Session = Depends(get_db)):
     """获取报告封面信息"""
@@ -755,77 +605,6 @@ async def get_image_by_path(report_id: str, path: str, db: Session = Depends(get
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取图片失败: {str(e)}")
-
-
-@app.get("/api/reports")
-async def list_reports(
-    page: int = 1,
-    page_size: int = 20,
-    db: Session = Depends(get_db)
-):
-    """获取报告列表"""
-    offset = (page - 1) * page_size
-    
-    total = db.query(Report).count()
-    reports = db.query(Report).order_by(Report.created_at.desc()).offset(offset).limit(page_size).all()
-    
-    result = []
-    for report in reports:
-        cover = db.query(ReportCover).filter(ReportCover.report_id == report.report_id).first()
-        
-        # 统计信息
-        assets_count = db.query(ReportAsset).filter(ReportAsset.report_id == report.report_id).count()
-        tara_count = db.query(ReportTARAResult).filter(ReportTARAResult.report_id == report.report_id).count()
-        attack_trees_count = db.query(ReportAttackTree).filter(ReportAttackTree.report_id == report.report_id).count()
-        
-        result.append({
-            "id": report.report_id,
-            "report_id": report.report_id,
-            "name": cover.report_title if cover else "TARA报告",
-            "project_name": cover.project_name if cover else "",
-            "report_title": cover.report_title if cover else "",
-            "status": report.status,
-            "created_at": report.created_at.isoformat(),
-            "file_path": "",
-            "statistics": {
-                "assets_count": assets_count,
-                "threats_count": tara_count,
-                "high_risk_count": 0,
-                "measures_count": tara_count,
-                "attack_trees_count": attack_trees_count
-            }
-        })
-    
-    return {
-        "success": True,
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "reports": result
-    }
-
-
-@app.delete("/api/reports/{report_id}")
-async def delete_report(report_id: str, db: Session = Depends(get_db)):
-    """删除报告"""
-    report = db.query(Report).filter(Report.report_id == report_id).first()
-    if not report:
-        raise HTTPException(status_code=404, detail="报告不存在")
-    
-    # 删除MinIO中的图片
-    minio = get_minio_client()
-    images = db.query(ReportImage).filter(ReportImage.report_id == report_id).all()
-    for image in images:
-        try:
-            minio.delete_file(image.minio_bucket, image.minio_path)
-        except:
-            pass
-    
-    # 删除数据库记录（级联删除）
-    db.delete(report)
-    db.commit()
-    
-    return {"success": True, "message": "报告已删除"}
 
 
 @app.post("/api/upload/batch")

@@ -194,18 +194,27 @@ DELETE /api/reports/{report_id}
 
 ```
 backend/
-├── pyproject.toml          # 项目配置
-├── README.md               # 说明文档
-├── tara_api/
+├── pyproject.toml              # 项目配置
+├── README.md                   # 说明文档
+├── data-service/               # 数据服务
 │   ├── __init__.py
-│   ├── main.py             # FastAPI应用
-│   ├── models.py           # Pydantic数据模型
-│   ├── tara_excel_generator.py  # Excel生成器
-│   ├── tara_pdf_generator.py    # PDF生成器（支持中文）
-│   └── fonts/              # 自定义字体目录（可选）
-├── uploads/                # 上传文件目录
-│   └── images/             # 图片存储
-└── reports/                # 生成的报告
+│   ├── main.py                 # FastAPI应用
+│   ├── database.py             # 数据库配置
+│   ├── models.py               # SQLAlchemy数据模型
+│   ├── minio_client.py         # MinIO客户端
+│   ├── Dockerfile
+│   └── pyproject.toml
+├── report-service/             # 报告服务
+│   ├── __init__.py
+│   ├── main.py                 # FastAPI应用
+│   ├── database.py             # 数据库配置
+│   ├── models.py               # SQLAlchemy数据模型
+│   ├── minio_client.py         # MinIO客户端
+│   ├── tara_excel_generator.py # Excel生成器
+│   ├── tara_pdf_generator.py   # PDF生成器（支持中文）
+│   ├── Dockerfile
+│   └── pyproject.toml
+└── Dockerfile                  # 后端通用Dockerfile
 ```
 
 ## 开发
