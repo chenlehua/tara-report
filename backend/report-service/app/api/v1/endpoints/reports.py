@@ -33,31 +33,31 @@ async def fetch_data_from_service(report_id: str) -> Dict[str, Any]:
     """
     async with httpx.AsyncClient(timeout=30.0) as client:
         # Get cover data
-        cover_resp = await client.get(f"{settings.DATA_SERVICE_URL}/api/reports/{report_id}/cover")
+        cover_resp = await client.get(f"{settings.DATA_SERVICE_URL}/api/v1/reports/{report_id}/cover")
         if cover_resp.status_code != 200:
             raise HTTPException(status_code=404, detail="无法获取封面数据")
         cover_data = cover_resp.json()
         
         # Get definitions data
-        definitions_resp = await client.get(f"{settings.DATA_SERVICE_URL}/api/reports/{report_id}/definitions")
+        definitions_resp = await client.get(f"{settings.DATA_SERVICE_URL}/api/v1/reports/{report_id}/definitions")
         if definitions_resp.status_code != 200:
             raise HTTPException(status_code=404, detail="无法获取定义数据")
         definitions_data = definitions_resp.json()
         
         # Get assets data
-        assets_resp = await client.get(f"{settings.DATA_SERVICE_URL}/api/reports/{report_id}/assets")
+        assets_resp = await client.get(f"{settings.DATA_SERVICE_URL}/api/v1/reports/{report_id}/assets")
         if assets_resp.status_code != 200:
             raise HTTPException(status_code=404, detail="无法获取资产数据")
         assets_data = assets_resp.json()
         
         # Get attack trees data
-        attack_trees_resp = await client.get(f"{settings.DATA_SERVICE_URL}/api/reports/{report_id}/attack-trees")
+        attack_trees_resp = await client.get(f"{settings.DATA_SERVICE_URL}/api/v1/reports/{report_id}/attack-trees")
         if attack_trees_resp.status_code != 200:
             raise HTTPException(status_code=404, detail="无法获取攻击树数据")
         attack_trees_data = attack_trees_resp.json()
         
         # Get TARA results data
-        tara_resp = await client.get(f"{settings.DATA_SERVICE_URL}/api/reports/{report_id}/tara-results")
+        tara_resp = await client.get(f"{settings.DATA_SERVICE_URL}/api/v1/reports/{report_id}/tara-results")
         if tara_resp.status_code != 200:
             raise HTTPException(status_code=404, detail="无法获取TARA结果数据")
         tara_data = tara_resp.json()
@@ -211,7 +211,7 @@ async def list_reports(
         downloads = {}
         for gf in generated_files:
             downloads[gf.file_type] = {
-                "url": f"/api/reports/{report.report_id}/download?format={gf.file_type}",
+                "url": f"/api/v1/reports/{report.report_id}/download?format={gf.file_type}",
                 "file_size": gf.file_size,
                 "generated_at": gf.generated_at.isoformat() if gf.generated_at else None
             }
@@ -279,7 +279,7 @@ async def get_report_info(report_id: str, db: Session = Depends(get_db)):
     def build_image_url(minio_path):
         if not minio_path:
             return None
-        return f"/api/reports/{report_id}/image-by-path?path={minio_path}"
+        return f"/api/v1/reports/{report_id}/image-by-path?path={minio_path}"
     
     # Build assets list
     assets_list = [
@@ -355,7 +355,7 @@ async def get_report_info(report_id: str, db: Session = Depends(get_db)):
     downloads = {}
     for gf in generated_files:
         downloads[gf.file_type] = {
-            "url": f"/api/reports/{report_id}/download?format={gf.file_type}",
+            "url": f"/api/v1/reports/{report_id}/download?format={gf.file_type}",
             "file_size": gf.file_size,
             "generated_at": gf.generated_at.isoformat() if gf.generated_at else None
         }
@@ -532,7 +532,7 @@ async def generate_report(
             "report_id": report_id,
             "format": format.lower(),
             "file_size": len(file_content),
-            "download_url": f"/api/reports/{report_id}/download?format={format.lower()}",
+            "download_url": f"/api/v1/reports/{report_id}/download?format={format.lower()}",
             "file_name": f"{project_name}_{report_id}{suffix}"
         }
         
@@ -642,7 +642,7 @@ async def preview_report(report_id: str, db: Session = Depends(get_db)):
     downloads = {}
     for gf in generated_files:
         downloads[gf.file_type] = {
-            "url": f"/api/reports/{report_id}/download?format={gf.file_type}",
+            "url": f"/api/v1/reports/{report_id}/download?format={gf.file_type}",
             "file_size": gf.file_size,
             "generated_at": gf.generated_at.isoformat() if gf.generated_at else None
         }
@@ -661,7 +661,7 @@ async def preview_report(report_id: str, db: Session = Depends(get_db)):
     def build_image_url(minio_path):
         if not minio_path:
             return None
-        return f"/api/reports/{report_id}/image-by-path?path={minio_path}"
+        return f"/api/v1/reports/{report_id}/image-by-path?path={minio_path}"
     
     # Process attack trees, add image_url
     attack_trees = []

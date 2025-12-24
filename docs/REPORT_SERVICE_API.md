@@ -71,7 +71,7 @@ http://report-service:8002
 
 ---
 
-#### GET /api/health
+#### GET /api/v1/health
 
 健康检查，返回服务和依赖状态。
 
@@ -81,7 +81,7 @@ http://report-service:8002
 │ Client │          │ Report Service │          │ MySQL │          │ MinIO │          │ Data Service │
 └───┬────┘          └───────┬────────┘          └───┬───┘          └───┬───┘          └──────┬───────┘
     │                       │                       │                  │                     │
-    │  GET /api/health      │                       │                  │                     │
+    │  GET /api/v1/health      │                       │                  │                     │
     │──────────────────────>│                       │                  │                     │
     │                       │                       │                  │                     │
     │                       │  SELECT 1             │                  │                     │
@@ -90,7 +90,7 @@ http://report-service:8002
     │                       │  Check connection     │                  │                     │
     │                       │──────────────────────────────────────────>│                     │
     │                       │                       │                  │                     │
-    │                       │  GET /api/health      │                  │                     │
+    │                       │  GET /api/v1/health      │                  │                     │
     │                       │────────────────────────────────────────────────────────────────>│
     │                       │                       │                  │                     │
     │  { status, services } │                       │                  │                     │
@@ -115,7 +115,7 @@ http://report-service:8002
 
 ### 2. 报告列表
 
-#### GET /api/reports
+#### GET /api/v1/reports
 
 获取报告列表。
 
@@ -125,7 +125,7 @@ http://report-service:8002
 │ Client │          │ Report Service │          │ MySQL │
 └───┬────┘          └───────┬────────┘          └───┬───┘
     │                       │                       │
-    │  GET /api/reports     │                       │
+    │  GET /api/v1/reports     │                       │
     │  ?page=1&page_size=20 │                       │
     │──────────────────────>│                       │
     │                       │                       │
@@ -191,12 +191,12 @@ http://report-service:8002
       },
       "downloads": {
         "xlsx": {
-          "url": "/api/reports/RPT-xxx/download?format=xlsx",
+          "url": "/api/v1/reports/RPT-xxx/download?format=xlsx",
           "file_size": 125840,
           "generated_at": "2025-01-15T10:35:00"
         },
         "pdf": {
-          "url": "/api/reports/RPT-xxx/download?format=pdf",
+          "url": "/api/v1/reports/RPT-xxx/download?format=pdf",
           "file_size": 256000,
           "generated_at": "2025-01-15T10:36:00"
         }
@@ -210,7 +210,7 @@ http://report-service:8002
 
 ### 3. 报告详情
 
-#### GET /api/reports/{report_id}
+#### GET /api/v1/reports/{report_id}
 
 获取报告完整信息。
 
@@ -220,7 +220,7 @@ http://report-service:8002
 │ Client │          │ Report Service │          │ MySQL │
 └───┬────┘          └───────┬────────┘          └───┬───┘
     │                       │                       │
-    │  GET /api/reports/    │                       │
+    │  GET /api/v1/reports/    │                       │
     │  {report_id}          │                       │
     │──────────────────────>│                       │
     │                       │                       │
@@ -303,7 +303,7 @@ http://report-service:8002
 
 ### 4. 删除报告
 
-#### DELETE /api/reports/{report_id}
+#### DELETE /api/v1/reports/{report_id}
 
 删除报告及其所有关联资源。
 
@@ -313,7 +313,7 @@ http://report-service:8002
 │ Client │          │ Report Service │          │ MySQL │          │ MinIO │
 └───┬────┘          └───────┬────────┘          └───┬───┘          └───┬───┘
     │                       │                       │                  │
-    │  DELETE /api/reports/ │                       │                  │
+    │  DELETE /api/v1/reports/ │                       │                  │
     │  {report_id}          │                       │                  │
     │──────────────────────>│                       │                  │
     │                       │                       │                  │
@@ -378,7 +378,7 @@ http://report-service:8002
 
 ### 5. 报告生成
 
-#### POST /api/reports/{report_id}/generate
+#### POST /api/v1/reports/{report_id}/generate
 
 生成报告文件（Excel或PDF）。
 
@@ -388,7 +388,7 @@ http://report-service:8002
 │ Client │          │ Report Service │          │ Data Service │          │ MySQL │          │ MinIO │
 └───┬────┘          └───────┬────────┘          └──────┬───────┘          └───┬───┘          └───┬───┘
     │                       │                          │                      │                  │
-    │  POST /api/reports/   │                          │                      │                  │
+    │  POST /api/v1/reports/   │                          │                      │                  │
     │  {id}/generate        │                          │                      │                  │
     │  ?format=xlsx         │                          │                      │                  │
     │──────────────────────>│                          │                      │                  │
@@ -442,7 +442,7 @@ http://report-service:8002
   "report_id": "RPT-20250115-ABC12345",
   "format": "xlsx",
   "file_size": 125840,
-  "download_url": "/api/reports/RPT-20250115-ABC12345/download?format=xlsx",
+  "download_url": "/api/v1/reports/RPT-20250115-ABC12345/download?format=xlsx",
   "file_name": "项目名称_RPT-20250115-ABC12345.xlsx"
 }
 ```
@@ -451,7 +451,7 @@ http://report-service:8002
 
 ### 6. 报告下载
 
-#### GET /api/reports/{report_id}/download
+#### GET /api/v1/reports/{report_id}/download
 
 下载报告文件（格式作为查询参数）。
 
@@ -461,7 +461,7 @@ http://report-service:8002
 │ Client │          │ Report Service │          │ MySQL │          │ MinIO │
 └───┬────┘          └───────┬────────┘          └───┬───┘          └───┬───┘
     │                       │                       │                  │
-    │  GET /api/reports/    │                       │                  │
+    │  GET /api/v1/reports/    │                       │                  │
     │  {id}/download        │                       │                  │
     │  ?format=xlsx         │                       │                  │
     │──────────────────────>│                       │                  │
@@ -501,7 +501,7 @@ http://report-service:8002
 
 ---
 
-#### GET /api/reports/{report_id}/download/{format}
+#### GET /api/v1/reports/{report_id}/download/{format}
 
 下载报告文件（格式作为路径参数）。
 
@@ -516,7 +516,7 @@ http://report-service:8002
 
 ### 7. 报告预览
 
-#### GET /api/reports/{report_id}/preview
+#### GET /api/v1/reports/{report_id}/preview
 
 获取报告预览数据。
 
@@ -526,7 +526,7 @@ http://report-service:8002
 │ Client │          │ Report Service │          │ Data Service │          │ MySQL │
 └───┬────┘          └───────┬────────┘          └──────┬───────┘          └───┬───┘
     │                       │                          │                      │
-    │  GET /api/reports/    │                          │                      │
+    │  GET /api/v1/reports/    │                          │                      │
     │  {id}/preview         │                          │                      │
     │──────────────────────>│                          │                      │
     │                       │                          │                      │
@@ -551,7 +551,7 @@ http://report-service:8002
 
 ### 8. 报告状态
 
-#### GET /api/reports/{report_id}/status
+#### GET /api/v1/reports/{report_id}/status
 
 获取报告状态信息。
 
@@ -561,7 +561,7 @@ http://report-service:8002
 │ Client │          │ Report Service │          │ MySQL │
 └───┬────┘          └───────┬────────┘          └───┬───┘
     │                       │                       │
-    │  GET /api/reports/    │                       │
+    │  GET /api/v1/reports/    │                       │
     │  {id}/status          │                       │
     │──────────────────────>│                       │
     │                       │                       │
@@ -626,11 +626,11 @@ PDF报告包含与Excel相同的内容，支持中文字体显示。
 
 | 端点 | 说明 |
 |------|------|
-| GET /api/reports/{report_id}/cover | 获取封面数据 |
-| GET /api/reports/{report_id}/definitions | 获取定义数据 |
-| GET /api/reports/{report_id}/assets | 获取资产数据 |
-| GET /api/reports/{report_id}/attack-trees | 获取攻击树数据 |
-| GET /api/reports/{report_id}/tara-results | 获取TARA结果数据 |
+| GET /api/v1/reports/{report_id}/cover | 获取封面数据 |
+| GET /api/v1/reports/{report_id}/definitions | 获取定义数据 |
+| GET /api/v1/reports/{report_id}/assets | 获取资产数据 |
+| GET /api/v1/reports/{report_id}/attack-trees | 获取攻击树数据 |
+| GET /api/v1/reports/{report_id}/tara-results | 获取TARA结果数据 |
 
 ### MinIO
 
@@ -684,39 +684,39 @@ PDF报告包含与Excel相同的内容，支持中文字体显示。
 ### 获取报告列表
 
 ```bash
-curl "http://report-service:8002/api/reports?page=1&page_size=20"
+curl "http://report-service:8002/api/v1/reports?page=1&page_size=20"
 ```
 
 ### 获取报告详情
 
 ```bash
-curl "http://report-service:8002/api/reports/RPT-20250115-ABC12345"
+curl "http://report-service:8002/api/v1/reports/RPT-20250115-ABC12345"
 ```
 
 ### 删除报告
 
 ```bash
-curl -X DELETE "http://report-service:8002/api/reports/RPT-20250115-ABC12345"
+curl -X DELETE "http://report-service:8002/api/v1/reports/RPT-20250115-ABC12345"
 ```
 
 ### 生成报告
 
 ```bash
 # 生成Excel报告
-curl -X POST "http://report-service:8002/api/reports/RPT-20250115-ABC12345/generate?format=xlsx"
+curl -X POST "http://report-service:8002/api/v1/reports/RPT-20250115-ABC12345/generate?format=xlsx"
 
 # 生成PDF报告
-curl -X POST "http://report-service:8002/api/reports/RPT-20250115-ABC12345/generate?format=pdf"
+curl -X POST "http://report-service:8002/api/v1/reports/RPT-20250115-ABC12345/generate?format=pdf"
 ```
 
 ### 下载报告
 
 ```bash
 # 下载Excel
-curl -O "http://report-service:8002/api/reports/RPT-20250115-ABC12345/download?format=xlsx"
+curl -O "http://report-service:8002/api/v1/reports/RPT-20250115-ABC12345/download?format=xlsx"
 
 # 下载PDF
-curl -O "http://report-service:8002/api/reports/RPT-20250115-ABC12345/download/pdf"
+curl -O "http://report-service:8002/api/v1/reports/RPT-20250115-ABC12345/download/pdf"
 ```
 
 ---
@@ -731,7 +731,7 @@ curl -O "http://report-service:8002/api/reports/RPT-20250115-ABC12345/download/p
 └───┬────┘          └───┬───┘          └───────┬────────┘          └───┬───┘
     │                   │                      │                       │
     │ [获取报告列表]    │                      │                       │
-    │  GET /api/reports │                      │                       │
+    │  GET /api/v1/reports │                      │                       │
     │──────────────────>│                      │                       │
     │                   │─────────────────────>│                       │
     │                   │                      │──────────────────────>│
@@ -739,7 +739,7 @@ curl -O "http://report-service:8002/api/reports/RPT-20250115-ABC12345/download/p
     │<───────────────────────────────────────────                      │
     │                   │                      │                       │
     │ [获取报告详情]    │                      │                       │
-    │  GET /api/reports/{id}                   │                       │
+    │  GET /api/v1/reports/{id}                   │                       │
     │──────────────────>│                      │                       │
     │                   │─────────────────────>│                       │
     │                   │                      │──────────────────────>│
@@ -747,7 +747,7 @@ curl -O "http://report-service:8002/api/reports/RPT-20250115-ABC12345/download/p
     │<───────────────────────────────────────────                      │
     │                   │                      │                       │
     │ [删除报告]        │                      │                       │
-    │  DELETE /api/reports/{id}                │                       │
+    │  DELETE /api/v1/reports/{id}                │                       │
     │──────────────────>│                      │                       │
     │                   │─────────────────────>│                       │
     │                   │                      │  Delete from MinIO    │

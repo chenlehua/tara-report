@@ -71,7 +71,7 @@ http://data-service:8001
 
 ---
 
-#### GET /api/health
+#### GET /api/v1/health
 
 健康检查，返回服务和依赖状态。
 
@@ -81,7 +81,7 @@ http://data-service:8001
 │ Client │          │ Data Service │          │ MySQL │          │ MinIO │
 └───┬────┘          └──────┬───────┘          └───┬───┘          └───┬───┘
     │                      │                      │                  │
-    │  GET /api/health     │                      │                  │
+    │  GET /api/v1/health     │                      │                  │
     │─────────────────────>│                      │                  │
     │                      │                      │                  │
     │                      │  SELECT 1            │                  │
@@ -117,7 +117,7 @@ http://data-service:8001
 
 ### 2. 图片管理
 
-#### POST /api/images/upload
+#### POST /api/v1/images/upload
 
 上传图片（临时存储）。
 
@@ -127,7 +127,7 @@ http://data-service:8001
 │ Client │          │ Data Service │          │ MinIO │
 └───┬────┘          └──────┬───────┘          └───┬───┘
     │                      │                      │
-    │  POST /api/images/   │                      │
+    │  POST /api/v1/images/   │                      │
     │  upload              │                      │
     │  [file, image_type]  │                      │
     │─────────────────────>│                      │
@@ -177,14 +177,14 @@ http://data-service:8001
   "success": true,
   "message": "图片上传成功",
   "image_id": "IMG-abc123def456",
-  "image_url": "/api/images/IMG-abc123def456",
+  "image_url": "/api/v1/images/IMG-abc123def456",
   "image_type": "item_boundary"
 }
 ```
 
 ---
 
-#### GET /api/images/{image_id}
+#### GET /api/v1/images/{image_id}
 
 获取图片。
 
@@ -194,7 +194,7 @@ http://data-service:8001
 │ Client │          │ Data Service │          │ MySQL │          │ MinIO │
 └───┬────┘          └──────┬───────┘          └───┬───┘          └───┬───┘
     │                      │                      │                  │
-    │  GET /api/images/    │                      │                  │
+    │  GET /api/v1/images/    │                      │                  │
     │  {image_id}          │                      │                  │
     │─────────────────────>│                      │                  │
     │                      │                      │                  │
@@ -233,7 +233,7 @@ http://data-service:8001
 
 ### 3. 报告数据上传
 
-#### POST /api/reports/upload
+#### POST /api/v1/reports/upload
 
 上传JSON参数和图片，生成报告ID并保存数据到数据库。
 
@@ -243,7 +243,7 @@ http://data-service:8001
 │ Client │          │ Data Service │          │ MySQL │          │ MinIO │
 └───┬────┘          └──────┬───────┘          └───┬───┘          └───┬───┘
     │                      │                      │                  │
-    │  POST /api/reports/  │                      │                  │
+    │  POST /api/v1/reports/  │                      │                  │
     │  upload              │                      │                  │
     │  [json, images]      │                      │                  │
     │─────────────────────>│                      │                  │
@@ -308,7 +308,7 @@ http://data-service:8001
 
 ---
 
-#### POST /api/upload/batch
+#### POST /api/v1/upload/batch
 
 批量上传JSON和图片文件，一键生成报告。
 
@@ -318,7 +318,7 @@ http://data-service:8001
 │ Client │          │ Data Service │          │ Report Service │          │ MySQL │          │ MinIO │
 └───┬────┘          └──────┬───────┘          └───────┬────────┘          └───┬───┘          └───┬───┘
     │                      │                          │                      │                  │
-    │  POST /api/upload/   │                          │                      │                  │
+    │  POST /api/v1/upload/   │                          │                      │                  │
     │  batch               │                          │                      │                  │
     │  [json, images]      │                          │                      │                  │
     │─────────────────────>│                          │                      │                  │
@@ -360,8 +360,8 @@ http://data-service:8001
   "message": "报告生成成功",
   "report_id": "RPT-20250115-ABC12345",
   "report_info": {...},
-  "download_url": "/api/reports/RPT-20250115-ABC12345/download",
-  "preview_url": "/api/reports/RPT-20250115-ABC12345/preview"
+  "download_url": "/api/v1/reports/RPT-20250115-ABC12345/download",
+  "preview_url": "/api/v1/reports/RPT-20250115-ABC12345/preview"
 }
 ```
 
@@ -371,7 +371,7 @@ http://data-service:8001
 
 以下端点主要供 Report Service 内部调用获取报告数据。
 
-#### GET /api/reports/{report_id}/cover
+#### GET /api/v1/reports/{report_id}/cover
 
 获取报告封面信息。
 
@@ -381,7 +381,7 @@ http://data-service:8001
 │ Report Service │          │ Data Service │          │ MySQL │
 └───────┬────────┘          └──────┬───────┘          └───┬───┘
         │                          │                      │
-        │  GET /api/reports/       │                      │
+        │  GET /api/v1/reports/       │                      │
         │  {report_id}/cover       │                      │
         │─────────────────────────>│                      │
         │                          │                      │
@@ -412,19 +412,19 @@ http://data-service:8001
 
 ---
 
-#### GET /api/reports/{report_id}/definitions
+#### GET /api/v1/reports/{report_id}/definitions
 
 获取报告相关定义。
 
-#### GET /api/reports/{report_id}/assets
+#### GET /api/v1/reports/{report_id}/assets
 
 获取报告资产列表。
 
-#### GET /api/reports/{report_id}/attack-trees
+#### GET /api/v1/reports/{report_id}/attack-trees
 
 获取报告攻击树。
 
-#### GET /api/reports/{report_id}/tara-results
+#### GET /api/v1/reports/{report_id}/tara-results
 
 获取TARA分析结果。
 
@@ -432,7 +432,7 @@ http://data-service:8001
 
 ### 5. 图片访问
 
-#### GET /api/reports/{report_id}/images/{image_id}
+#### GET /api/v1/reports/{report_id}/images/{image_id}
 
 获取报告关联的图片。
 
@@ -442,7 +442,7 @@ http://data-service:8001
 │ Client │          │ Data Service │          │ MySQL │          │ MinIO │
 └───┬────┘          └──────┬───────┘          └───┬───┘          └───┬───┘
     │                      │                      │                  │
-    │  GET /api/reports/   │                      │                  │
+    │  GET /api/v1/reports/   │                      │                  │
     │  {id}/images/{img}   │                      │                  │
     │─────────────────────>│                      │                  │
     │                      │                      │                  │
@@ -465,7 +465,7 @@ http://data-service:8001
 
 ---
 
-#### GET /api/reports/{report_id}/image-by-path
+#### GET /api/v1/reports/{report_id}/image-by-path
 
 根据MinIO路径获取图片。
 

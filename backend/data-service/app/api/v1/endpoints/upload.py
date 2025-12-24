@@ -231,7 +231,7 @@ async def upload_batch(
         async with httpx.AsyncClient(timeout=120.0) as client:
             # Generate Excel report
             excel_resp = await client.post(
-                f"{settings.REPORT_SERVICE_URL}/api/reports/{report_id}/generate",
+                f"{settings.REPORT_SERVICE_URL}/api/v1/reports/{report_id}/generate",
                 params={"format": "xlsx"}
             )
             if excel_resp.status_code == 200:
@@ -241,7 +241,7 @@ async def upload_batch(
             
             # Generate PDF report
             pdf_resp = await client.post(
-                f"{settings.REPORT_SERVICE_URL}/api/reports/{report_id}/generate",
+                f"{settings.REPORT_SERVICE_URL}/api/v1/reports/{report_id}/generate",
                 params={"format": "pdf"}
             )
             if pdf_resp.status_code == 200:
@@ -266,6 +266,6 @@ async def upload_batch(
             'file_size': 0,
             'statistics': statistics
         },
-        'download_url': f"/api/reports/{report_id}/download",
-        'preview_url': f"/api/reports/{report_id}/preview"
+        'download_url': f"/api/v1/reports/{report_id}/download",
+        'preview_url': f"/api/v1/reports/{report_id}/preview"
     }

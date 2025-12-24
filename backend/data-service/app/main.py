@@ -44,8 +44,8 @@ async def root():
     }
 
 
-# Include API router with /api prefix
-app.include_router(api_router, prefix="/api")
+# Include API router with /api/v1 prefix
+app.include_router(api_router, prefix="/api/v1")
 
 
 # ==================== Startup function ====================

@@ -94,7 +94,7 @@ async def upload_image(
         "success": True,
         "message": "图片上传成功",
         "image_id": image_id,
-        "image_url": f"/api/images/{image_id}",
+        "image_url": f"/api/v1/images/{image_id}",
         "image_type": image_type
     }
 

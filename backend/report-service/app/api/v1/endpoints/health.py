@@ -32,7 +32,7 @@ async def health_check(db: Session = Depends(get_db)):
     # Check data service connection
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
-            resp = await client.get(f"{settings.DATA_SERVICE_URL}/api/health")
+            resp = await client.get(f"{settings.DATA_SERVICE_URL}/api/v1/health")
             data_service_status = "healthy" if resp.status_code == 200 else "unhealthy"
     except Exception as e:
         data_service_status = f"unhealthy: {str(e)}"
