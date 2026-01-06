@@ -778,12 +778,15 @@ Report Service 在返回报告详情、预览数据和生成报告时，会自�
 | 端点 | 说明 |
 |------|------|
 | GET /api/v1/reports/{report_id}/cover | 获取封面数据 |
-| GET /api/v1/reports/{report_id}/definitions | 获取定义数据 |
-| GET /api/v1/reports/{report_id}/assets | 获取资产数据 |
+| GET /api/v1/reports/{report_id}/definitions | 获取定义数据（不含图片路径） |
+| GET /api/v1/reports/{report_id}/images | 获取图片MinIO路径（项目边界图、系统架构图、软件架构图、数据流图） |
+| GET /api/v1/reports/{report_id}/assets | 获取资产数据（不含图片路径） |
 | GET /api/v1/reports/{report_id}/attack-trees | 获取攻击树数据 |
 | GET /api/v1/reports/{report_id}/tara-results | 获取TARA结果原始数据 |
 
-> **注意**: Data Service 的 tara-results 端点只返回原始数据。Report Service 在获取数据后会自动计算派生列（攻击可行性、影响等级、风险等级等），并在报告详情、预览和生成报告时包含这些计算结果。
+> **注意**: 
+> - Data Service 的 `/definitions` 和 `/assets` 端点不再返回图片路径，图片路径通过 `/images` 端点获取。
+> - Data Service 的 `/tara-results` 端点只返回原始数据。Report Service 在获取数据后会自动计算派生列（攻击可行性、影响等级、风险等级等），并在报告详情、预览和生成报告时包含这些计算结果。
 
 ### MinIO
 

@@ -356,7 +356,7 @@ async def get_report_cover(report_id: str, db: Session = Depends(get_db)):
 
 @router.get("/reports/{report_id}/definitions")
 async def get_report_definitions(report_id: str, db: Session = Depends(get_db)):
-    """Get report definitions"""
+    """Get report definitions (without image paths)"""
     definitions = db.query(ReportDefinitions).filter(ReportDefinitions.report_id == report_id).first()
     if not definitions:
         raise HTTPException(status_code=404, detail="相关定义不存在")
@@ -364,22 +364,32 @@ async def get_report_definitions(report_id: str, db: Session = Depends(get_db)):
     return {
         "title": definitions.title,
         "functional_description": definitions.functional_description,
-        "item_boundary_image": definitions.item_boundary_image,
-        "system_architecture_image": definitions.system_architecture_image,
-        "software_architecture_image": definitions.software_architecture_image,
-        "dataflow_image": definitions.dataflow_image,
         "assumptions": definitions.assumptions or [],
         "terminology": definitions.terminology or []
     }
 
 
+@router.get("/reports/{report_id}/images")
+async def get_report_images(report_id: str, db: Session = Depends(get_db)):
+    """
+    Get report image paths from MinIO
+    获取报告相关图片的MinIO路径
+    """
+    definitions = db.query(ReportDefinitions).filter(ReportDefinitions.report_id == report_id).first()
+    if not definitions:
+        raise HTTPException(status_code=404, detail="报告定义不存在")
+    
+    return {
+        "item_boundary_image": definitions.item_boundary_image,
+        "system_architecture_image": definitions.system_architecture_image,
+        "software_architecture_image": definitions.software_architecture_image,
+        "dataflow_image": definitions.dataflow_image
+    }
+
+
 @router.get("/reports/{report_id}/assets")
 async def get_report_assets(report_id: str, db: Session = Depends(get_db)):
-    """Get report assets"""
-    # Get dataflow_image from definitions
-    definitions = db.query(ReportDefinitions).filter(ReportDefinitions.report_id == report_id).first()
-    dataflow_image = getattr(definitions, 'dataflow_image', None) if definitions else None
-    
+    """Get report assets (without image paths)"""
     assets = db.query(ReportAsset).filter(ReportAsset.report_id == report_id).all()
     
     # Get cover info for title
@@ -388,7 +398,6 @@ async def get_report_assets(report_id: str, db: Session = Depends(get_db)):
     
     return {
         "title": f"{title_prefix} - 资产列表 Asset List",
-        "dataflow_image": dataflow_image,
         "assets": [
             {
                 "id": asset.asset_id,

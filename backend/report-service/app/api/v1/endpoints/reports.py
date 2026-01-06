@@ -71,6 +71,12 @@ async def fetch_data_from_service(report_id: str) -> Dict[str, Any]:
             raise HTTPException(status_code=404, detail="无法获取定义数据")
         definitions_data = definitions_resp.json()
         
+        # Get image paths
+        images_resp = await client.get(f"{settings.DATA_SERVICE_URL}/api/v1/reports/{report_id}/images")
+        if images_resp.status_code != 200:
+            raise HTTPException(status_code=404, detail="无法获取图片路径数据")
+        images_data = images_resp.json()
+        
         # Get assets data
         assets_resp = await client.get(f"{settings.DATA_SERVICE_URL}/api/v1/reports/{report_id}/assets")
         if assets_resp.status_code != 200:
@@ -92,6 +98,7 @@ async def fetch_data_from_service(report_id: str) -> Dict[str, Any]:
     return {
         "cover": cover_data,
         "definitions": definitions_data,
+        "images": images_data,
         "assets": assets_data,
         "attack_trees": attack_trees_data,
         "tara_results": tara_data
@@ -150,26 +157,27 @@ async def prepare_report_data(report_id: str) -> Dict[str, Any]:
     # Get data
     data = await fetch_data_from_service(report_id)
     
-    # Download images and replace paths
+    # Get image paths from images endpoint
+    images = data.get('images', {})
     definitions = data.get('definitions', {})
+    assets = data.get('assets', {})
     
-    # Download definition images
-    if definitions.get('item_boundary_image'):
-        local_path = await download_image_from_minio(definitions['item_boundary_image'], report_id)
+    # Download definition images from images data
+    if images.get('item_boundary_image'):
+        local_path = await download_image_from_minio(images['item_boundary_image'], report_id)
         definitions['item_boundary_image'] = local_path
     
-    if definitions.get('system_architecture_image'):
-        local_path = await download_image_from_minio(definitions['system_architecture_image'], report_id)
+    if images.get('system_architecture_image'):
+        local_path = await download_image_from_minio(images['system_architecture_image'], report_id)
         definitions['system_architecture_image'] = local_path
     
-    if definitions.get('software_architecture_image'):
-        local_path = await download_image_from_minio(definitions['software_architecture_image'], report_id)
+    if images.get('software_architecture_image'):
+        local_path = await download_image_from_minio(images['software_architecture_image'], report_id)
         definitions['software_architecture_image'] = local_path
     
-    # Download dataflow image from assets
-    assets = data.get('assets', {})
-    if assets.get('dataflow_image'):
-        local_path = await download_image_from_minio(assets['dataflow_image'], report_id)
+    # Download dataflow image from images data
+    if images.get('dataflow_image'):
+        local_path = await download_image_from_minio(images['dataflow_image'], report_id)
         assets['dataflow_image'] = local_path
     
     # Download attack tree images
@@ -285,6 +293,7 @@ async def get_report_info(report_id: str, db: Session = Depends(get_db)):
     
     cover_data = data.get('cover', {})
     definitions_data = data.get('definitions', {})
+    images_data = data.get('images', {})
     assets_data = data.get('assets', {})
     attack_trees_data = data.get('attack_trees', {})
     tara_results_data = data.get('tara_results', {})
@@ -339,14 +348,14 @@ async def get_report_info(report_id: str, db: Session = Depends(get_db)):
         "cover": cover_data,
         "definitions": {
             **definitions_data,
-            'item_boundary_image': build_image_url(definitions_data.get('item_boundary_image')),
-            'system_architecture_image': build_image_url(definitions_data.get('system_architecture_image')),
-            'software_architecture_image': build_image_url(definitions_data.get('software_architecture_image'))
+            'item_boundary_image': build_image_url(images_data.get('item_boundary_image')),
+            'system_architecture_image': build_image_url(images_data.get('system_architecture_image')),
+            'software_architecture_image': build_image_url(images_data.get('software_architecture_image'))
         },
         "assets": {
             "title": assets_data.get('title', '资产列表'),
             "assets": assets_list,
-            "dataflow_image": build_image_url(assets_data.get('dataflow_image'))
+            "dataflow_image": build_image_url(images_data.get('dataflow_image'))
         },
         "attack_trees": {
             "title": attack_trees_data.get('title', '攻击树分析'),
@@ -599,6 +608,7 @@ async def preview_report(report_id: str, db: Session = Depends(get_db)):
     # Parse data to expected format
     cover_data = data.get('cover', {})
     definitions_data = data.get('definitions', {})
+    images_data = data.get('images', {})
     assets_data = data.get('assets', {})
     attack_trees_data = data.get('attack_trees', {})
     tara_results_data = data.get('tara_results', {})
@@ -656,14 +666,14 @@ async def preview_report(report_id: str, db: Session = Depends(get_db)):
         'cover': cover_data,
         'definitions': {
             **definitions_data,
-            'item_boundary_image': build_image_url(definitions_data.get('item_boundary_image')),
-            'system_architecture_image': build_image_url(definitions_data.get('system_architecture_image')),
-            'software_architecture_image': build_image_url(definitions_data.get('software_architecture_image'))
+            'item_boundary_image': build_image_url(images_data.get('item_boundary_image')),
+            'system_architecture_image': build_image_url(images_data.get('system_architecture_image')),
+            'software_architecture_image': build_image_url(images_data.get('software_architecture_image'))
         },
         'assets': {
             'title': assets_data.get('title', '资产列表'),
             'assets': assets_list,
-            'dataflow_image': build_image_url(assets_data.get('dataflow_image'))
+            'dataflow_image': build_image_url(images_data.get('dataflow_image'))
         },
         'attack_trees': {
             'title': attack_trees_data.get('title', '攻击树分析'),

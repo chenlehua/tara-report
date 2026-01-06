@@ -414,7 +414,9 @@ http://data-service:8001
 
 #### GET /api/v1/reports/{report_id}/definitions
 
-获取报告相关定义，包括项目描述、架构图路径、假设条件和术语表。
+获取报告相关定义，包括项目描述、假设条件和术语表。
+
+> **注意**: 图片路径已移至独立的 `/images` 接口，请使用该接口获取图片路径。
 
 **时序图:**
 ```
@@ -455,10 +457,6 @@ curl -X GET "http://data-service:8001/api/v1/reports/RPT-20250115-ABC12345/defin
 |------|------|------|
 | title | string | 项目/系统标题 |
 | functional_description | string | 功能描述 |
-| item_boundary_image | string | 项目边界图的MinIO路径，可能为null |
-| system_architecture_image | string | 系统架构图的MinIO路径，可能为null |
-| software_architecture_image | string | 软件架构图的MinIO路径，可能为null |
-| dataflow_image | string | 数据流图的MinIO路径，可能为null |
 | assumptions | array | 假设条件列表 |
 | assumptions[].id | string | 假设条件ID |
 | assumptions[].content | string | 假设条件内容 |
@@ -471,10 +469,6 @@ curl -X GET "http://data-service:8001/api/v1/reports/RPT-20250115-ABC12345/defin
 {
   "title": "智能网联汽车网关系统",
   "functional_description": "该系统负责车辆内部网络与外部网络的通信管理，包括数据转发、协议转换、安全防护等功能。",
-  "item_boundary_image": "RPT-20250115-ABC12345/item_boundary/IMG-abc123def456.png",
-  "system_architecture_image": "RPT-20250115-ABC12345/system_architecture/IMG-def456abc789.png",
-  "software_architecture_image": "RPT-20250115-ABC12345/software_architecture/IMG-789abc123def.png",
-  "dataflow_image": "RPT-20250115-ABC12345/dataflow/IMG-456def789abc.png",
   "assumptions": [
     {
       "id": "A001",
@@ -507,9 +501,91 @@ curl -X GET "http://data-service:8001/api/v1/reports/RPT-20250115-ABC12345/defin
 
 ---
 
+#### GET /api/v1/reports/{report_id}/images
+
+获取报告相关图片的MinIO存储路径。
+
+**时序图:**
+```
+┌────────────────┐          ┌──────────────┐          ┌───────┐
+│ Report Service │          │ Data Service │          │ MySQL │
+└───────┬────────┘          └──────┬───────┘          └───┬───┘
+        │                          │                      │
+        │  GET /api/v1/reports/    │                      │
+        │  {report_id}/images      │                      │
+        │─────────────────────────>│                      │
+        │                          │                      │
+        │                          │  Query definitions   │
+        │                          │─────────────────────>│
+        │                          │                      │
+        │                          │  Image paths         │
+        │                          │<─────────────────────│
+        │                          │                      │
+        │  { image paths }         │                      │
+        │<─────────────────────────│                      │
+        │                          │                      │
+```
+
+**路径参数:**
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| report_id | string | 是 | 报告ID，格式为 RPT-YYYYMMDD-XXXXXXXX |
+
+**请求示例:**
+
+```bash
+curl -X GET "http://data-service:8001/api/v1/reports/RPT-20250115-ABC12345/images"
+```
+
+**响应字段说明:**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| item_boundary_image | string | 项目边界图的MinIO路径，可能为null |
+| system_architecture_image | string | 系统架构图的MinIO路径，可能为null |
+| software_architecture_image | string | 软件架构图的MinIO路径，可能为null |
+| dataflow_image | string | 数据流图的MinIO路径，可能为null |
+
+**成功响应示例 (200 OK):**
+```json
+{
+  "item_boundary_image": "RPT-20250115-ABC12345/item_boundary/IMG-abc123def456.png",
+  "system_architecture_image": "RPT-20250115-ABC12345/system_architecture/IMG-def456abc789.png",
+  "software_architecture_image": "RPT-20250115-ABC12345/software_architecture/IMG-789abc123def.png",
+  "dataflow_image": "RPT-20250115-ABC12345/dataflow/IMG-456def789abc.png"
+}
+```
+
+**空数据响应示例 (200 OK):**
+```json
+{
+  "item_boundary_image": null,
+  "system_architecture_image": null,
+  "software_architecture_image": null,
+  "dataflow_image": null
+}
+```
+
+**错误响应:**
+
+| 状态码 | 说明 | 响应示例 |
+|--------|------|----------|
+| 404 | 报告定义不存在 | `{"detail": "报告定义不存在"}` |
+| 500 | 服务器内部错误 | `{"detail": "服务器内部错误"}` |
+
+**注意事项:**
+- 此接口用于获取报告相关图片在MinIO中的存储路径
+- Report Service 在生成报告时通过此接口获取图片路径，然后从MinIO下载图片
+- 返回的路径可通过 `/api/v1/reports/{report_id}/image-by-path?path={path}` 获取实际图片
+
+---
+
 #### GET /api/v1/reports/{report_id}/assets
 
-获取报告资产列表，包括数据流图和所有资产的安全属性。
+获取报告资产列表，包括所有资产的安全属性。
+
+> **注意**: 数据流图路径已移至独立的 `/images` 接口，请使用该接口获取图片路径。
 
 **时序图:**
 ```
@@ -521,10 +597,6 @@ curl -X GET "http://data-service:8001/api/v1/reports/RPT-20250115-ABC12345/defin
         │  {report_id}/assets      │                      │
         │─────────────────────────>│                      │
         │                          │                      │
-        │                          │  Query definitions   │
-        │                          │  (for dataflow_image)│
-        │                          │─────────────────────>│
-        │                          │                      │
         │                          │  Query assets        │
         │                          │─────────────────────>│
         │                          │                      │
@@ -535,8 +607,7 @@ curl -X GET "http://data-service:8001/api/v1/reports/RPT-20250115-ABC12345/defin
         │                          │  Records             │
         │                          │<─────────────────────│
         │                          │                      │
-        │  { title, dataflow_image,│                      │
-        │    assets[] }            │                      │
+        │  { title, assets[] }     │                      │
         │<─────────────────────────│                      │
         │                          │                      │
 ```
@@ -558,7 +629,6 @@ curl -X GET "http://data-service:8001/api/v1/reports/RPT-20250115-ABC12345/asset
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | title | string | 资产列表标题，格式为 "{项目名称} - 资产列表 Asset List" |
-| dataflow_image | string | 数据流图的MinIO路径，可能为null |
 | assets | array | 资产列表 |
 | assets[].id | string | 资产ID |
 | assets[].name | string | 资产名称 |
@@ -575,7 +645,6 @@ curl -X GET "http://data-service:8001/api/v1/reports/RPT-20250115-ABC12345/asset
 ```json
 {
   "title": "智能网联汽车网关系统 - 资产列表 Asset List",
-  "dataflow_image": "RPT-20250115-ABC12345/dataflow/IMG-456def789abc.png",
   "assets": [
     {
       "id": "AS001",
