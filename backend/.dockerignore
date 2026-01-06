@@ -45,5 +45,6 @@ reports/
 # Misc
 .DS_Store
 *.log
-.env
 .env.local
+
+# 注意: .env 文件需要被复制到容器中，因此不在此处忽略
