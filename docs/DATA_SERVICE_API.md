@@ -743,7 +743,9 @@ curl -X GET "http://data-service:8001/api/v1/reports/RPT-20250115-ABC12345/attac
 
 #### GET /api/v1/reports/{report_id}/tara-results
 
-获取TARA（Threat Analysis and Risk Assessment，威胁分析和风险评估）分析结果，包含完整的威胁场景、攻击路径、安全措施以及**后端自动计算的派生列**。这是TARA报告中最核心的数据部分。
+获取TARA（Threat Analysis and Risk Assessment，威胁分析和风险评估）分析结果原始数据，包含完整的威胁场景、攻击路径和安全措施。这是TARA报告中最核心的数据部分。
+
+> **注意**: 此端点仅返回原始数据，不包含计算的派生列。如需获取包含计算列的数据，请使用 Report Service 的报告详情或预览接口。
 
 **时序图:**
 ```
@@ -762,14 +764,7 @@ curl -X GET "http://data-service:8001/api/v1/reports/RPT-20250115-ABC12345/attac
         │                          │  TARA result records │
         │                          │<─────────────────────│
         │                          │                      │
-        │                          │  Calculate derived   │
-        │                          │  columns             │
-        │                          │──────┐               │
-        │                          │      │               │
-        │                          │<─────┘               │
-        │                          │                      │
-        │  { title, results[]     │                      │
-        │    with calculated cols }│                      │
+        │  { title, results[] }    │                      │
         │<─────────────────────────│                      │
         │                          │                      │
 ```
@@ -791,11 +786,9 @@ curl -X GET "http://data-service:8001/api/v1/reports/RPT-20250115-ABC12345/tara-
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | title | string | TARA分析结果标题，固定为 "TARA分析结果 TARA Analysis Results" |
-| results | array | TARA分析结果列表，按sort_order排序，包含计算列 |
+| results | array | TARA分析结果列表，按sort_order排序 |
 
 **results数组元素字段说明:**
-
-**基础字段（用户输入）:**
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
@@ -821,86 +814,16 @@ curl -X GET "http://data-service:8001/api/v1/reports/RPT-20250115-ABC12345/tara-
 | security_goal | string | 安全目标 |
 | security_requirement | string | 安全需求/对策 |
 
-**攻击可行性计算字段（自动生成）:**
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| attack_vector_value | float | 攻击向量指标值（网络=0.85, 邻居=0.62, 本地=0.55, 物理=0.2） |
-| attack_complexity_value | float | 攻击复杂度指标值（低=0.77, 高=0.44） |
-| privileges_required_value | float | 权限要求指标值（无=0.85, 低=0.62, 高=0.27） |
-| user_interaction_value | float | 用户交互指标值（不需要=0.85, 需要=0.62） |
-| attack_feasibility_value | float | 攻击可行性计算值 = 8.22 × AV × AC × PR × UI |
-| attack_feasibility_level | string | 攻击可行性等级（很低/低/中/高/很高） |
-
-**影响分析计算字段（自动生成）:**
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| safety_impact_value | int | 安全影响指标值（可忽略不计的=0, 中等的=1, 重大的=10, 严重的=1000） |
-| financial_impact_value | int | 经济影响指标值 |
-| operational_impact_value | int | 操作影响指标值 |
-| privacy_impact_value | int | 隐私影响指标值 |
-| total_impact_value | int | 影响总计算值 = 安全 + 经济 + 操作 + 隐私 |
-| impact_level | string | 影响等级（无影响/可忽略不计的/中等的/重大的/严重的） |
-
-**影响注释字段（自动生成）:**
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| safety_note | string | 安全影响注释说明 |
-| financial_note | string | 经济影响注释说明 |
-| operational_note | string | 操作影响注释说明 |
-| privacy_note | string | 隐私影响注释说明 |
-
-**风险评估计算字段（自动生成）:**
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| risk_level | string | 风险等级（QM/Low/Medium/High/Critical） |
-| risk_treatment | string | 风险处置决策（保留风险/降低风险/降低风险/规避风险/转移风险） |
-| calculated_security_goal | string | 计算后的安全目标（基于风险处置决策） |
-| wp29_control_mapping | string | WP29控制映射（基于STRIDE模型） |
-
 **STRIDE威胁模型分类说明:**
 
-| STRIDE类型 | 英文全称 | 中文说明 | WP29控制映射 |
-|------------|----------|----------|--------------|
-| S欺骗 | Spoofing | 身份欺骗，冒充其他用户或系统 | M23 |
-| T篡改 | Tampering | 恶意修改数据或代码 | M10 |
-| R抵赖 | Repudiation | 否认执行过某操作 | M24 |
-| I信息泄露 | Information Disclosure | 未授权访问敏感信息 | M11 |
-| D拒绝服务 | Denial of Service | 使系统或服务不可用 | M13 |
-| E权限提升 | Elevation of Privilege | 获取未授权的访问权限 | M16 |
-
-**攻击可行性等级计算规则:**
-
-| 计算值范围 | 等级 |
-|------------|------|
-| ≤ 1.05 | 很低 |
-| 1.06 ~ 1.99 | 低 |
-| 2.00 ~ 2.99 | 中 |
-| 3.00 ~ 3.99 | 高 |
-| ≥ 4.00 | 很高 |
-
-**影响等级计算规则:**
-
-| 影响总值范围 | 影响等级 |
-|--------------|----------|
-| 0 | 无影响 |
-| 1 ~ 9 | 可忽略不计的 |
-| 10 ~ 99 | 中等的 |
-| 100 ~ 999 | 重大的 |
-| ≥ 1000 | 严重的 |
-
-**风险等级计算规则（基于影响等级和攻击可行性等级的矩阵）:**
-
-| 影响等级 \ 可行性 | 很低 | 低 | 中 | 高 | 很高 |
-|-------------------|------|-----|-----|-----|------|
-| 无影响 | QM | Low | Low | Low | Low |
-| 可忽略不计的 | Low | Low | Low | Medium | Medium |
-| 中等的 | Low | Low | Medium | High | High |
-| 重大的 | Low | Medium | High | Critical | Critical |
-| 严重的 | Medium | High | Critical | Critical | Critical |
+| STRIDE类型 | 英文全称 | 中文说明 |
+|------------|----------|----------|
+| S欺骗 | Spoofing | 身份欺骗，冒充其他用户或系统 |
+| T篡改 | Tampering | 恶意修改数据或代码 |
+| R抵赖 | Repudiation | 否认执行过某操作 |
+| I信息泄露 | Information Disclosure | 未授权访问敏感信息 |
+| D拒绝服务 | Denial of Service | 使系统或服务不可用 |
+| E权限提升 | Elevation of Privilege | 获取未授权的访问权限 |
 
 **成功响应示例 (200 OK):**
 ```json
@@ -928,31 +851,7 @@ curl -X GET "http://data-service:8001/api/v1/reports/RPT-20250115-ABC12345/tara-
       "operational_impact": "中等的",
       "privacy_impact": "重大的",
       "security_goal": "防止未授权访问诊断数据",
-      "security_requirement": "实施诊断认证机制，对敏感数据进行加密存储",
-      
-      "attack_vector_value": 0.2,
-      "attack_complexity_value": 0.77,
-      "privileges_required_value": 0.85,
-      "user_interaction_value": 0.85,
-      "attack_feasibility_value": 0.91,
-      "attack_feasibility_level": "很低",
-      
-      "safety_impact_value": 0,
-      "financial_impact_value": 1,
-      "operational_impact_value": 1,
-      "privacy_impact_value": 10,
-      "total_impact_value": 12,
-      "impact_level": "中等的",
-      
-      "safety_note": "没有受伤",
-      "financial_note": "财务损失会产生中等影响",
-      "operational_note": "操作损坏会导致车辆功能中等减少",
-      "privacy_note": "隐私危害会产生重大影响",
-      
-      "risk_level": "Low",
-      "risk_treatment": "保留风险",
-      "calculated_security_goal": "/",
-      "wp29_control_mapping": "M11"
+      "security_requirement": "实施诊断认证机制，对敏感数据进行加密存储"
     }
   ]
 }
@@ -975,20 +874,19 @@ curl -X GET "http://data-service:8001/api/v1/reports/RPT-20250115-ABC12345/tara-
 
 **影响等级说明:**
 
-| 等级 | 中文 | 指标值 | 说明 |
-|------|------|--------|------|
-| 可忽略不计的 | Negligible | 0 | 无影响或可忽略 |
-| 中等的 | Moderate | 1 | 中等影响，需要关注 |
-| 重大的 | Major | 10 | 严重影响，需要优先处理 |
-| 严重的 | Severe | 1000 | 关键影响，需要立即处理 |
+| 等级 | 说明 |
+|------|------|
+| 可忽略不计的 | 无影响或可忽略 |
+| 中等的 | 中等影响，需要关注 |
+| 重大的 | 严重影响，需要优先处理 |
+| 严重的 | 关键影响，需要立即处理 |
 
 **注意事项:**
 - TARA结果列表按照 sort_order 字段升序排列
 - 如果没有TARA分析结果，results 数组将返回空列表 `[]`
 - 每条TARA结果对应一个具体的威胁场景分析
 - WP.29映射字段用于关联联合国WP.29法规要求
-- **所有计算字段由后端自动生成**，前端可直接使用无需重复计算
-- 计算公式与Excel报告中的公式保持一致，确保数据一致性
+- **此端点仅返回原始数据**，派生列（如攻击可行性、影响等级、风险等级等）由 Report Service 计算
 
 ---
 

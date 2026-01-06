@@ -20,7 +20,6 @@ from app.common.models import (
     ReportAttackTree, ReportTARAResult, ReportImage
 )
 from app.common.constants.enums import ALLOWED_IMAGE_EXTENSIONS
-from app.common.utils.calculations import calculate_tara_derived_columns
 
 router = APIRouter()
 
@@ -431,46 +430,39 @@ async def get_report_attack_trees(report_id: str, db: Session = Depends(get_db))
 
 @router.get("/reports/{report_id}/tara-results")
 async def get_report_tara_results(report_id: str, db: Session = Depends(get_db)):
-    """Get TARA analysis results with calculated columns"""
+    """Get TARA analysis results (raw data only)"""
     results = db.query(ReportTARAResult).filter(
         ReportTARAResult.report_id == report_id
     ).order_by(ReportTARAResult.sort_order).all()
     
-    # 构建结果列表，包含计算列
-    results_with_calculations = []
-    for r in results:
-        # 基础数据
-        base_data = {
-            "asset_id": r.asset_id,
-            "asset_name": r.asset_name,
-            "subdomain1": r.subdomain1,
-            "subdomain2": r.subdomain2,
-            "subdomain3": r.subdomain3,
-            "category": r.category,
-            "security_attribute": r.security_attribute,
-            "stride_model": r.stride_model,
-            "threat_scenario": r.threat_scenario,
-            "attack_path": r.attack_path,
-            "wp29_mapping": r.wp29_mapping,
-            "attack_vector": r.attack_vector,
-            "attack_complexity": r.attack_complexity,
-            "privileges_required": r.privileges_required,
-            "user_interaction": r.user_interaction,
-            "safety_impact": r.safety_impact,
-            "financial_impact": r.financial_impact,
-            "operational_impact": r.operational_impact,
-            "privacy_impact": r.privacy_impact,
-            "security_goal": r.security_goal,
-            "security_requirement": r.security_requirement
-        }
-        
-        # 添加计算列
-        result_with_calcs = calculate_tara_derived_columns(base_data)
-        results_with_calculations.append(result_with_calcs)
-    
     return {
         "title": "TARA分析结果 TARA Analysis Results",
-        "results": results_with_calculations
+        "results": [
+            {
+                "asset_id": r.asset_id,
+                "asset_name": r.asset_name,
+                "subdomain1": r.subdomain1,
+                "subdomain2": r.subdomain2,
+                "subdomain3": r.subdomain3,
+                "category": r.category,
+                "security_attribute": r.security_attribute,
+                "stride_model": r.stride_model,
+                "threat_scenario": r.threat_scenario,
+                "attack_path": r.attack_path,
+                "wp29_mapping": r.wp29_mapping,
+                "attack_vector": r.attack_vector,
+                "attack_complexity": r.attack_complexity,
+                "privileges_required": r.privileges_required,
+                "user_interaction": r.user_interaction,
+                "safety_impact": r.safety_impact,
+                "financial_impact": r.financial_impact,
+                "operational_impact": r.operational_impact,
+                "privacy_impact": r.privacy_impact,
+                "security_goal": r.security_goal,
+                "security_requirement": r.security_requirement
+            }
+            for r in results
+        ]
     }
 
 

@@ -581,24 +581,28 @@ http://report-service:8002
     │                       │                          │                      │
     │                       │  GET cover, definitions, │                      │
     │                       │  assets, attack-trees,   │                      │
-    │                       │  tara-results (含计算列)  │                      │
+    │                       │  tara-results (原始数据) │                      │
     │                       │─────────────────────────>│                      │
+    │                       │                          │                      │
+    │                       │  Calculate TARA derived  │                      │
+    │                       │  columns locally         │                      │
+    │                       │───────┐                  │                      │
+    │                       │       │                  │                      │
+    │                       │<──────┘                  │                      │
     │                       │                          │                      │
     │                       │  Query generated_files   │                      │
     │                       │─────────────────────────────────────────────────>│
     │                       │                          │                      │
-    │                       │  Query report & cover    │                      │
-    │                       │─────────────────────────────────────────────────>│
-    │                       │                          │                      │
     │  { preview data,      │                          │                      │
-    │    downloads }        │                          │                      │
+    │    with calculated    │                          │                      │
+    │    columns }          │                          │                      │
     │<──────────────────────│                          │                      │
     │                       │                          │                      │
 ```
 
 **响应说明:**
 
-预览数据包含与报告详情相同的结构，其中 `tara_results` 部分包含后端自动计算的派生列：
+预览数据包含与报告详情相同的结构，其中 `tara_results` 部分包含 **Report Service 自动计算**的派生列：
 
 - **攻击可行性计算**: attack_vector_value, attack_complexity_value, privileges_required_value, user_interaction_value, attack_feasibility_value, attack_feasibility_level
 - **影响分析计算**: safety_impact_value, financial_impact_value, operational_impact_value, privacy_impact_value, total_impact_value, impact_level
@@ -678,6 +682,93 @@ PDF报告包含与Excel相同的内容，支持中文字体显示。
 
 ---
 
+## TARA计算列说明
+
+Report Service 在返回报告详情、预览数据和生成报告时，会自动计算并添加以下派生列：
+
+### 攻击可行性计算字段
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| attack_vector_value | float | 攻击向量指标值（网络=0.85, 邻居=0.62, 本地=0.55, 物理=0.2） |
+| attack_complexity_value | float | 攻击复杂度指标值（低=0.77, 高=0.44） |
+| privileges_required_value | float | 权限要求指标值（无=0.85, 低=0.62, 高=0.27） |
+| user_interaction_value | float | 用户交互指标值（不需要=0.85, 需要=0.62） |
+| attack_feasibility_value | float | 攻击可行性计算值 = 8.22 × AV × AC × PR × UI |
+| attack_feasibility_level | string | 攻击可行性等级（很低/低/中/高/很高） |
+
+### 影响分析计算字段
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| safety_impact_value | int | 安全影响指标值（可忽略不计的=0, 中等的=1, 重大的=10, 严重的=1000） |
+| financial_impact_value | int | 经济影响指标值 |
+| operational_impact_value | int | 操作影响指标值 |
+| privacy_impact_value | int | 隐私影响指标值 |
+| total_impact_value | int | 影响总计算值 = 安全 + 经济 + 操作 + 隐私 |
+| impact_level | string | 影响等级（无影响/可忽略不计的/中等的/重大的/严重的） |
+
+### 影响注释字段
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| safety_note | string | 安全影响注释说明 |
+| financial_note | string | 经济影响注释说明 |
+| operational_note | string | 操作影响注释说明 |
+| privacy_note | string | 隐私影响注释说明 |
+
+### 风险评估计算字段
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| risk_level | string | 风险等级（QM/Low/Medium/High/Critical） |
+| risk_treatment | string | 风险处置决策（保留风险/降低风险/规避风险/转移风险） |
+| calculated_security_goal | string | 计算后的安全目标（基于风险处置决策） |
+| wp29_control_mapping | string | WP29控制映射（基于STRIDE模型） |
+
+### 攻击可行性等级计算规则
+
+| 计算值范围 | 等级 |
+|------------|------|
+| ≤ 1.05 | 很低 |
+| 1.06 ~ 1.99 | 低 |
+| 2.00 ~ 2.99 | 中 |
+| 3.00 ~ 3.99 | 高 |
+| ≥ 4.00 | 很高 |
+
+### 影响等级计算规则
+
+| 影响总值范围 | 影响等级 |
+|--------------|----------|
+| 0 | 无影响 |
+| 1 ~ 9 | 可忽略不计的 |
+| 10 ~ 99 | 中等的 |
+| 100 ~ 999 | 重大的 |
+| ≥ 1000 | 严重的 |
+
+### 风险等级计算规则（矩阵）
+
+| 影响等级 \ 可行性 | 很低 | 低 | 中 | 高 | 很高 |
+|-------------------|------|-----|-----|-----|------|
+| 无影响 | QM | Low | Low | Low | Low |
+| 可忽略不计的 | Low | Low | Low | Medium | Medium |
+| 中等的 | Low | Low | Medium | High | High |
+| 重大的 | Low | Medium | High | Critical | Critical |
+| 严重的 | Medium | High | Critical | Critical | Critical |
+
+### STRIDE类型与WP29控制映射
+
+| STRIDE类型 | WP29控制映射 |
+|------------|--------------|
+| S欺骗 | M23 |
+| T篡改 | M10 |
+| R抵赖 | M24 |
+| I信息泄露 | M11 |
+| D拒绝服务 | M13 |
+| E权限提升 | M16 |
+
+---
+
 ## 服务依赖
 
 ### 数据服务 (Data Service)
@@ -690,7 +781,9 @@ PDF报告包含与Excel相同的内容，支持中文字体显示。
 | GET /api/v1/reports/{report_id}/definitions | 获取定义数据 |
 | GET /api/v1/reports/{report_id}/assets | 获取资产数据 |
 | GET /api/v1/reports/{report_id}/attack-trees | 获取攻击树数据 |
-| GET /api/v1/reports/{report_id}/tara-results | 获取TARA结果数据（含后端自动计算的派生列） |
+| GET /api/v1/reports/{report_id}/tara-results | 获取TARA结果原始数据 |
+
+> **注意**: Data Service 的 tara-results 端点只返回原始数据。Report Service 在获取数据后会自动计算派生列（攻击可行性、影响等级、风险等级等），并在报告详情、预览和生成报告时包含这些计算结果。
 
 ### MinIO
 

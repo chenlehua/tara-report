@@ -23,6 +23,7 @@ from app.common.config.settings import settings
 from app.common.models import (
     RSReport, RSReportCover, RSGeneratedFile, RSReportStatistics
 )
+from app.common.utils.calculations import calculate_tara_derived_columns
 from app.generators import generate_tara_excel_from_json, generate_tara_pdf_from_json
 
 router = APIRouter()
@@ -178,6 +179,13 @@ async def prepare_report_data(report_id: str) -> Dict[str, Any]:
             local_path = await download_image_from_minio(tree['image'], report_id)
             tree['image'] = local_path
     
+    # Add calculated columns to TARA results for report generation
+    tara_results = data.get('tara_results', {})
+    tara_results['results'] = [
+        calculate_tara_derived_columns(result) 
+        for result in tara_results.get('results', [])
+    ]
+    
     return data
 
 
@@ -298,8 +306,11 @@ async def get_report_info(report_id: str, db: Session = Depends(get_db)):
             tree_copy['image_url'] = build_image_url(tree['image'])
         attack_trees_list.append(tree_copy)
     
-    # Process TARA results
-    tara_results_list = tara_results_data.get('results', [])
+    # Process TARA results - add calculated columns
+    tara_results_list = [
+        calculate_tara_derived_columns(result) 
+        for result in tara_results_data.get('results', [])
+    ]
     
     # Statistics
     statistics = {
@@ -608,7 +619,11 @@ async def preview_report(report_id: str, db: Session = Depends(get_db)):
     
     # Calculate statistics
     assets_list = assets_data.get('assets', [])
-    tara_results_list = tara_results_data.get('results', [])
+    # Add calculated columns to TARA results
+    tara_results_list = [
+        calculate_tara_derived_columns(result) 
+        for result in tara_results_data.get('results', [])
+    ]
     
     statistics = {
         'assets_count': len(assets_list),
