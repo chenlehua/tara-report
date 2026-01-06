@@ -665,70 +665,70 @@ def create_tara_results_sheet(wb: Workbook, data: Dict[str, Any]) -> None:
         ws[f'J{row}'] = result.get('attack_path', '')
         ws[f'K{row}'] = result.get('wp29_mapping', '')
         
-        # 威胁分析 - 攻击向量
+        # 威胁分析 - 攻击向量 (使用后端计算的值)
         attack_vector = result.get('attack_vector', '本地')
         ws[f'L{row}'] = attack_vector
-        ws[f'M{row}'] = f'=IF(L{row}="网络",0.85,IF(L{row}="邻居",0.62,IF(L{row}="本地",0.55,IF(L{row}="物理",0.2,0))))'
+        ws[f'M{row}'] = result.get('attack_vector_value', 0)
         
         # 攻击复杂度
         attack_complexity = result.get('attack_complexity', '低')
         ws[f'N{row}'] = attack_complexity
-        ws[f'O{row}'] = f'=IF(N{row}="低",0.77,IF(N{row}="高",0.44,0))'
+        ws[f'O{row}'] = result.get('attack_complexity_value', 0)
         
         # 权限要求
         privileges = result.get('privileges_required', '低')
         ws[f'P{row}'] = privileges
-        ws[f'Q{row}'] = f'=IF(P{row}="无",0.85,IF(P{row}="低",0.62,IF(P{row}="高",0.27,0)))'
+        ws[f'Q{row}'] = result.get('privileges_required_value', 0)
         
         # 用户交互
         user_interaction = result.get('user_interaction', '不需要')
         ws[f'R{row}'] = user_interaction
-        ws[f'S{row}'] = f'=IF(R{row}="不需要",0.85,IF(R{row}="需要",0.62,0))'
+        ws[f'S{row}'] = result.get('user_interaction_value', 0)
         
-        # 攻击可行性计算
-        ws[f'T{row}'] = f'=8.22*M{row}*O{row}*Q{row}*S{row}'
-        ws[f'U{row}'] = f'=IF(T{row}<=1.05,"很低",IF(T{row}<=1.99,"低",IF(T{row}<=2.99,"中",IF(T{row}<=3.99,"高","很高"))))'
+        # 攻击可行性计算 (使用后端计算的值)
+        ws[f'T{row}'] = result.get('attack_feasibility_value', 0)
+        ws[f'U{row}'] = result.get('attack_feasibility_level', '')
         
-        # 安全影响
+        # 安全影响 (使用后端计算的值)
         safety = result.get('safety_impact', '中等的')
         ws[f'V{row}'] = safety
-        ws[f'W{row}'] = f'=IF(V{row}="可忽略不计的","没有受伤",IF(V{row}="中等的","轻伤和中等伤害",IF(V{row}="重大的","严重伤害(生存概率高)",IF(V{row}="严重的","危及生命(生存概率不确定)或致命伤害",""))))'
-        ws[f'X{row}'] = f'=IF(V{row}="可忽略不计的",0,IF(V{row}="中等的",1,IF(V{row}="重大的",10,IF(V{row}="严重的",1000,0))))'
+        ws[f'W{row}'] = result.get('safety_note', '')
+        ws[f'X{row}'] = result.get('safety_impact_value', 0)
         
         # 经济影响
         financial = result.get('financial_impact', '中等的')
         ws[f'Y{row}'] = financial
-        ws[f'Z{row}'] = f'=IF(Y{row}="可忽略不计的","财务损失不会产生任何影响",IF(Y{row}="中等的","财务损失会产生中等影响",IF(Y{row}="重大的","财务损失会产生重大影响",IF(Y{row}="严重的","财务损失会产生严重影响",""))))'
-        ws[f'AA{row}'] = f'=IF(Y{row}="可忽略不计的",0,IF(Y{row}="中等的",1,IF(Y{row}="重大的",10,IF(Y{row}="严重的",1000,0))))'
+        ws[f'Z{row}'] = result.get('financial_note', '')
+        ws[f'AA{row}'] = result.get('financial_impact_value', 0)
         
         # 操作影响
         operational = result.get('operational_impact', '重大的')
         ws[f'AB{row}'] = operational
-        ws[f'AC{row}'] = f'=IF(AB{row}="可忽略不计的","操作损坏不会导致车辆功能减少",IF(AB{row}="中等的","操作损坏会导致车辆功能中等减少",IF(AB{row}="重大的","操作损坏会导致车辆功能重大减少",IF(AB{row}="严重的","操作损坏会导致车辆功能丧失",""))))'
-        ws[f'AD{row}'] = f'=IF(AB{row}="可忽略不计的",0,IF(AB{row}="中等的",1,IF(AB{row}="重大的",10,IF(AB{row}="严重的",1000,0))))'
+        ws[f'AC{row}'] = result.get('operational_note', '')
+        ws[f'AD{row}'] = result.get('operational_impact_value', 0)
         
         # 隐私影响
         privacy = result.get('privacy_impact', '可忽略不计的')
         ws[f'AE{row}'] = privacy
-        ws[f'AF{row}'] = f'=IF(AE{row}="可忽略不计的","隐私危害不会产生任何影响",IF(AE{row}="中等的","隐私危害会产生中等影响",IF(AE{row}="重大的","隐私危害会产生重大影响",IF(AE{row}="严重的","隐私危害会产生严重影响",""))))'
-        ws[f'AG{row}'] = f'=IF(AE{row}="可忽略不计的",0,IF(AE{row}="中等的",1,IF(AE{row}="重大的",10,IF(AE{row}="严重的",1000,0))))'
+        ws[f'AF{row}'] = result.get('privacy_note', '')
+        ws[f'AG{row}'] = result.get('privacy_impact_value', 0)
         
-        # 影响等级计算
-        ws[f'AH{row}'] = f'=SUM(X{row}+AA{row}+AD{row}+AG{row})'
-        ws[f'AI{row}'] = f'=IF(AH{row}>=1000,"严重的",IF(AH{row}>=100,"重大的",IF(AH{row}>=10,"中等的",IF(AH{row}>=1,"可忽略不计的","无影响"))))'
+        # 影响等级计算 (使用后端计算的值)
+        ws[f'AH{row}'] = result.get('total_impact_value', 0)
+        ws[f'AI{row}'] = result.get('impact_level', '')
         
-        # 风险等级
-        ws[f'AJ{row}'] = f'=IF(AND(AI{row}="无影响",U{row}="无"),"QM",IF(OR(AND(AI{row}="无影响",U{row}<>"无"),AND(AI{row}="可忽略不计的",OR(U{row}="很低",U{row}="低",U{row}="中")),AND(AI{row}="中等的",OR(U{row}="很低",U{row}="低")),AND(AI{row}="重大的",U{row}="很低")),"Low",IF(OR(AND(AI{row}="可忽略不计的",OR(U{row}="高",U{row}="很高")),AND(AI{row}="中等的",U{row}="中"),AND(AI{row}="重大的",U{row}="低"),AND(AI{row}="严重的",U{row}="很低")),"Medium",IF(OR(AND(AI{row}="中等的",OR(U{row}="高",U{row}="很高")),AND(AI{row}="重大的",U{row}="中"),AND(AI{row}="严重的",U{row}="低")),"High","Critical"))))'
+        # 风险等级 (使用后端计算的值)
+        ws[f'AJ{row}'] = result.get('risk_level', '')
         
         # 风险处置决策
-        ws[f'AK{row}'] = f'=IF(OR(AJ{row}="QM",AJ{row}="Low"),"保留风险",IF(AJ{row}="Medium","降低风险","降低风险/规避风险/转移风险"))'
+        ws[f'AK{row}'] = result.get('risk_treatment', '')
         
         # 安全目标和需求
-        ws[f'AL{row}'] = f'=IF(AK{row}="保留风险","/",IF(OR(AK{row}="降低风险",AK{row}="降低风险/规避风险/转移风险"),"需要定义安全目标",""))'
+        ws[f'AL{row}'] = result.get('calculated_security_goal', result.get('security_goal', ''))
         ws[f'AM{row}'] = result.get('security_requirement', '')
         
         # WP29控制映射
-        ws[f'AN{row}'] = f'=IF(H{row}="T篡改","M10",IF(H{row}="D拒绝服务","M13",IF(H{row}="I信息泄露","M11",IF(H{row}="S欺骗","M23",IF(H{row}="R抵赖","M24",IF(H{row}="E权限提升","M16",""))))))'
+        ws[f'AN{row}'] = result.get('wp29_control_mapping', '')
         
         # 设置边框
         for col_idx in range(1, 41):

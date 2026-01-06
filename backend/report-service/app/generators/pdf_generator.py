@@ -917,14 +917,21 @@ def create_tara_results_page(data: Dict[str, Any], styles) -> List:
         privileges_required = result.get('privileges_required', '低')
         user_interaction = result.get('user_interaction', '不需要')
         
-        # 计算指标值
-        av_value = calculate_attack_vector_value(attack_vector)
-        ac_value = calculate_attack_complexity_value(attack_complexity)
-        pr_value = calculate_privileges_value(privileges_required)
-        ui_value = calculate_user_interaction_value(user_interaction)
-        
-        # 计算攻击可行性
-        feasibility_calc, feasibility_level = calculate_attack_feasibility(av_value, ac_value, pr_value, ui_value)
+        # 优先使用后端预计算的值，如果没有则本地计算
+        if 'attack_vector_value' in result:
+            av_value = result.get('attack_vector_value', 0)
+            ac_value = result.get('attack_complexity_value', 0)
+            pr_value = result.get('privileges_required_value', 0)
+            ui_value = result.get('user_interaction_value', 0)
+            feasibility_calc = result.get('attack_feasibility_value', 0)
+            feasibility_level = result.get('attack_feasibility_level', '')
+        else:
+            # 本地计算指标值（兼容旧数据）
+            av_value = calculate_attack_vector_value(attack_vector)
+            ac_value = calculate_attack_complexity_value(attack_complexity)
+            pr_value = calculate_privileges_value(privileges_required)
+            ui_value = calculate_user_interaction_value(user_interaction)
+            feasibility_calc, feasibility_level = calculate_attack_feasibility(av_value, ac_value, pr_value, ui_value)
         
         threat_analysis_data = [
             ['项目', '攻击向量(V)', '攻击复杂度(C)', '权限要求(P)', '用户交互(U)', '攻击可行性'],
@@ -959,15 +966,22 @@ def create_tara_results_page(data: Dict[str, Any], styles) -> List:
         operational_impact = result.get('operational_impact', '重大的')
         privacy_impact = result.get('privacy_impact', '可忽略不计的')
         
-        # 计算影响指标值
-        safety_value = calculate_impact_value(safety_impact)
-        financial_value = calculate_impact_value(financial_impact)
-        operational_value = calculate_impact_value(operational_impact)
-        privacy_value = calculate_impact_value(privacy_impact)
-        
-        # 计算影响等级
-        impact_total = safety_value + financial_value + operational_value + privacy_value
-        impact_level = calculate_impact_level(impact_total)
+        # 优先使用后端预计算的值，如果没有则本地计算
+        if 'safety_impact_value' in result:
+            safety_value = result.get('safety_impact_value', 0)
+            financial_value = result.get('financial_impact_value', 0)
+            operational_value = result.get('operational_impact_value', 0)
+            privacy_value = result.get('privacy_impact_value', 0)
+            impact_total = result.get('total_impact_value', 0)
+            impact_level = result.get('impact_level', '')
+        else:
+            # 本地计算影响指标值（兼容旧数据）
+            safety_value = calculate_impact_value(safety_impact)
+            financial_value = calculate_impact_value(financial_impact)
+            operational_value = calculate_impact_value(operational_impact)
+            privacy_value = calculate_impact_value(privacy_impact)
+            impact_total = safety_value + financial_value + operational_value + privacy_value
+            impact_level = calculate_impact_level(impact_total)
         
         impact_data = [
             ['项目', '安全(Safety)', '经济(Financial)', '操作(Operational)', '隐私(Privacy)', '影响等级'],
@@ -1000,19 +1014,28 @@ def create_tara_results_page(data: Dict[str, Any], styles) -> List:
         # ========== 5. 风险评估 & 处置 Risk Assessment & Treatment ==========
         elements.append(Paragraph('<b>5. 风险评估与处置 Risk Assessment &amp; Treatment</b>', styles['TARABody']))
         
-        # 计算风险等级和处置决策
-        risk_level = calculate_risk_level(impact_level, feasibility_level)
-        risk_treatment = get_risk_treatment(risk_level)
-        wp29_control = get_wp29_control(result.get('stride_model', ''))
+        # 优先使用后端预计算的值，如果没有则本地计算
+        if 'risk_level' in result and result.get('risk_level'):
+            risk_level = result.get('risk_level', '')
+            risk_treatment = result.get('risk_treatment', '')
+            wp29_control = result.get('wp29_control_mapping', '')
+        else:
+            # 本地计算风险等级和处置决策（兼容旧数据）
+            risk_level = calculate_risk_level(impact_level, feasibility_level)
+            risk_treatment = get_risk_treatment(risk_level)
+            wp29_control = get_wp29_control(result.get('stride_model', ''))
         
         # 风险等级颜色
         risk_color = get_risk_color(risk_level)
         
+        # 使用后端计算的安全目标，如果没有则根据风险处置决策计算
+        security_goal = result.get('calculated_security_goal', '')
+        if not security_goal:
+            security_goal = '/' if risk_treatment == '保留风险' else '需要定义安全目标'
+        
         risk_data = [
             ['风险等级\nRisk Level', '风险处置决策\nRisk Treatment', '安全目标\nSecurity Goal', 'WP29控制映射'],
-            [risk_level, risk_treatment, 
-             '/' if risk_treatment == '保留风险' else '需要定义安全目标',
-             wp29_control],
+            [risk_level, risk_treatment, security_goal, wp29_control],
         ]
         
         risk_table = Table(risk_data, colWidths=[100, 130, 140, 100])
@@ -1079,29 +1102,36 @@ def create_risk_summary_page(data: Dict[str, Any], styles) -> List:
     risk_stats = {'Critical': 0, 'High': 0, 'Medium': 0, 'Low': 0, 'QM': 0}
     
     for idx, result in enumerate(results):
-        # 计算各项指标
-        attack_vector = result.get('attack_vector', '本地')
-        attack_complexity = result.get('attack_complexity', '低')
-        privileges_required = result.get('privileges_required', '低')
-        user_interaction = result.get('user_interaction', '不需要')
-        
-        av_value = calculate_attack_vector_value(attack_vector)
-        ac_value = calculate_attack_complexity_value(attack_complexity)
-        pr_value = calculate_privileges_value(privileges_required)
-        ui_value = calculate_user_interaction_value(user_interaction)
-        _, feasibility_level = calculate_attack_feasibility(av_value, ac_value, pr_value, ui_value)
-        
-        # 计算影响等级
-        safety_value = calculate_impact_value(result.get('safety_impact', '中等的'))
-        financial_value = calculate_impact_value(result.get('financial_impact', '中等的'))
-        operational_value = calculate_impact_value(result.get('operational_impact', '重大的'))
-        privacy_value = calculate_impact_value(result.get('privacy_impact', '可忽略不计的'))
-        impact_total = safety_value + financial_value + operational_value + privacy_value
-        impact_level = calculate_impact_level(impact_total)
-        
-        # 计算风险等级
-        risk_level = calculate_risk_level(impact_level, feasibility_level)
-        risk_treatment = get_risk_treatment(risk_level)
+        # 优先使用后端预计算的值，如果没有则本地计算
+        if 'attack_feasibility_level' in result:
+            feasibility_level = result.get('attack_feasibility_level', '')
+            impact_level = result.get('impact_level', '')
+            risk_level = result.get('risk_level', '')
+            risk_treatment = result.get('risk_treatment', '')
+        else:
+            # 本地计算各项指标（兼容旧数据）
+            attack_vector = result.get('attack_vector', '本地')
+            attack_complexity = result.get('attack_complexity', '低')
+            privileges_required = result.get('privileges_required', '低')
+            user_interaction = result.get('user_interaction', '不需要')
+            
+            av_value = calculate_attack_vector_value(attack_vector)
+            ac_value = calculate_attack_complexity_value(attack_complexity)
+            pr_value = calculate_privileges_value(privileges_required)
+            ui_value = calculate_user_interaction_value(user_interaction)
+            _, feasibility_level = calculate_attack_feasibility(av_value, ac_value, pr_value, ui_value)
+            
+            # 计算影响等级
+            safety_value = calculate_impact_value(result.get('safety_impact', '中等的'))
+            financial_value = calculate_impact_value(result.get('financial_impact', '中等的'))
+            operational_value = calculate_impact_value(result.get('operational_impact', '重大的'))
+            privacy_value = calculate_impact_value(result.get('privacy_impact', '可忽略不计的'))
+            impact_total = safety_value + financial_value + operational_value + privacy_value
+            impact_level = calculate_impact_level(impact_total)
+            
+            # 计算风险等级
+            risk_level = calculate_risk_level(impact_level, feasibility_level)
+            risk_treatment = get_risk_treatment(risk_level)
         
         # 统计
         risk_stats[risk_level] = risk_stats.get(risk_level, 0) + 1
