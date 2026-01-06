@@ -69,10 +69,13 @@ def get_report_list_from_local(page: int, page_size: int, db: Session) -> Dict[s
             RSReportStatistics.report_id == report.report_id
         ).first()
         
+        report_title = report.report_title or (cover.report_title if cover else "TARA报告")
         report_data = {
+            "id": report.report_id,  # 兼容前端
             "report_id": report.report_id,
+            "name": report_title,  # 兼容前端
             "project_name": report.project_name or (cover.project_name if cover else ""),
-            "report_title": report.report_title or (cover.report_title if cover else "TARA报告"),
+            "report_title": report_title,
             "report_title_en": report.report_title_en or (cover.report_title_en if cover else ""),
             "data_level": report.data_level or (cover.data_level if cover else ""),
             "document_number": report.document_number or (cover.document_number if cover else ""),
