@@ -40,7 +40,7 @@ COPY report-service/app ./app
 RUN pip install --no-cache-dir -e .
 
 # Expose port
-EXPOSE 8002
+EXPOSE 8006
 
 # Run the application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8002"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8006"]
