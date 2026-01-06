@@ -6,9 +6,18 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-# Load .env file from backend directory
-env_path = Path(__file__).resolve().parents[4] / ".env"
-load_dotenv(dotenv_path=env_path)
+# Load .env file from project root (/app/.env in Docker container)
+# Try multiple paths for flexibility (Docker container vs local development)
+possible_paths = [
+    Path("/app/.env"),  # Docker container
+    Path.cwd() / ".env",  # Current working directory
+    Path(__file__).resolve().parents[4] / ".env",  # Fallback: backend/.env
+]
+
+for env_path in possible_paths:
+    if env_path.exists():
+        load_dotenv(dotenv_path=env_path)
+        break
 
 
 class Settings:

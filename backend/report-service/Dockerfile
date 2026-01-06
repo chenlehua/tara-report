@@ -31,6 +31,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fonts-wqy-microhei \
     && rm -rf /var/lib/apt/lists/*
 
+# Copy .env file to project root
+COPY .env ./
+
 # Copy service files
 COPY report-service/pyproject.toml ./
 COPY report-service/__init__.py ./

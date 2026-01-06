@@ -29,6 +29,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Copy .env file to project root
+COPY .env ./
+
 # Copy service files
 COPY data-service/pyproject.toml ./
 COPY data-service/__init__.py ./
