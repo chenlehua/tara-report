@@ -55,6 +55,7 @@ up:
 	@echo "   报告服务API: http://localhost:8002"
 	@echo "   报告服务文档: http://localhost:8002/docs"
 	@echo "   MinIO控制台: http://localhost:9001 (minioadmin/minioadmin123)"
+	@echo "   phpMyAdmin: http://localhost:8080 (root/root123456)"
 
 # 停止服务
 down:
@@ -117,6 +118,10 @@ logs-minio:
 # 前端日志
 logs-frontend:
 	docker compose logs frontend
+
+# phpMyAdmin日志
+logs-phpmyadmin:
+	docker compose logs phpmyadmin
 
 # ==================== 清理命令 ====================
 
