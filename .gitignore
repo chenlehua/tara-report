@@ -1,6 +1,8 @@
 # Environment variables
+# Note: backend/.env is committed for development defaults
 .env
 !.env.example
+!backend/.env
 
 # Python
 __pycache__/
