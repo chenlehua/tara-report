@@ -12,14 +12,10 @@ const api = axios.create({
 })
 
 // 获取报告列表
-export async function getReports(page = 1, limit = 10): Promise<{ items: ReportInfo[]; total: number }> {
-  const response = await api.get('/reports', { params: { page, limit } })
-  // 适应后端返回格式 { success, reports, total }
-  const data = response.data
-  return {
-    items: data.reports || [],
-    total: data.total || 0
-  }
+export async function getReports(page = 1, limit = 10): Promise<{ success: boolean; reports: ReportInfo[]; total: number }> {
+  const response = await api.get('/reports', { params: { page, page_size: limit } })
+  // 返回后端原始格式 { success, reports, total, page, page_size }
+  return response.data
 }
 
 // 生成报告 (JSON数据)
