@@ -36,6 +36,9 @@ FROM nginx:alpine
 # === 配置 Alpine 使用阿里云镜像 ===
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
 
+# Install curl for healthcheck
+RUN apk add --no-cache curl
+
 # Copy custom nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 

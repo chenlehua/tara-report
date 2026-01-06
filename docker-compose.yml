@@ -113,6 +113,12 @@ services:
     depends_on:
       - data-service
       - report-service
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:30031/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     networks:
       - tara-network
 
