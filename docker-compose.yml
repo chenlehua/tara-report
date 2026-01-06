@@ -59,18 +59,10 @@ services:
     restart: unless-stopped
     ports:
       - "8001:8001"
+    env_file:
+      - ./backend/.env
     environment:
       - PYTHONUNBUFFERED=1
-      - MYSQL_HOST=mysql
-      - MYSQL_PORT=3306
-      - MYSQL_USER=tara
-      - MYSQL_PASSWORD=tara123456
-      - MYSQL_DATABASE=tara_db
-      - MINIO_ENDPOINT=minio:9000
-      - MINIO_ACCESS_KEY=minioadmin
-      - MINIO_SECRET_KEY=minioadmin123
-      - MINIO_SECURE=false
-      - REPORT_SERVICE_URL=http://report-service:8002
     depends_on:
       mysql:
         condition: service_healthy
@@ -94,18 +86,10 @@ services:
     restart: unless-stopped
     ports:
       - "8002:8002"
+    env_file:
+      - ./backend/.env
     environment:
       - PYTHONUNBUFFERED=1
-      - MYSQL_HOST=mysql
-      - MYSQL_PORT=3306
-      - MYSQL_USER=tara
-      - MYSQL_PASSWORD=tara123456
-      - MYSQL_DATABASE=tara_db
-      - MINIO_ENDPOINT=minio:9000
-      - MINIO_ACCESS_KEY=minioadmin
-      - MINIO_SECRET_KEY=minioadmin123
-      - MINIO_SECURE=false
-      - DATA_SERVICE_URL=http://data-service:8001
     depends_on:
       data-service:
         condition: service_healthy
