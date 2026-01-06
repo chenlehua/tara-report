@@ -30,7 +30,7 @@ services:
     restart: unless-stopped
     ports:
       - "9000:9000"
-      - "30032:9001"
+      - "30034:9001"
     env_file:
       - ./backend/.env
     volumes:
