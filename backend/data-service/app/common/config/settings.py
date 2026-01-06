@@ -20,7 +20,7 @@ class Settings:
     SERVICE_DESCRIPTION: str = "TARA报告数据管理服务 - 负责数据上传、解析和存储"
     
     # Report service URL
-    REPORT_SERVICE_URL: str = os.getenv("REPORT_SERVICE_URL", "http://report-service:8002")
+    REPORT_SERVICE_URL: str = os.getenv("REPORT_SERVICE_URL", "http://report-service:8006")
     
     # MySQL configuration
     MYSQL_HOST: str = os.getenv("MYSQL_HOST", "mysql")
