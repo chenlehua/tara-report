@@ -493,6 +493,11 @@ const emit = defineEmits<{
 
 const reportStore = useReportStore()
 
+// 从 previewData 中获取 reportId
+const reportId = computed(() => {
+  return props.previewData?.report_id || props.previewData?.id || ''
+})
+
 // 威胁详情弹窗状态
 const threatDetailVisible = ref(false)
 const selectedThreat = ref<any>(null)
@@ -553,9 +558,8 @@ function getImageUrl(imagePath?: string): string {
     return imagePath
   }
   // 对于其他路径（MinIO路径等），使用当前报告的 image-by-path 接口
-  // 注意：这需要 report_id 存在
-  if (props.reportId && imagePath) {
-    return `/api/v1/reports/${props.reportId}/image-by-path?path=${encodeURIComponent(imagePath)}`
+  if (reportId.value && imagePath) {
+    return `/api/v1/reports/${reportId.value}/image-by-path?path=${encodeURIComponent(imagePath)}`
   }
   return imagePath
 }
