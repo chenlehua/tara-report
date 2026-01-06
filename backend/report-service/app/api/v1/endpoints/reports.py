@@ -21,7 +21,9 @@ from sqlalchemy.orm import Session
 from app.common.database import get_db, get_minio_client
 from app.common.config.settings import settings
 from app.common.models import (
-    RSReport, RSReportCover, RSGeneratedFile, RSReportStatistics
+    RSReport, RSReportCover, RSReportDefinitions, RSReportAsset,
+    RSReportAttackTree, RSReportTARAResult, RSReportImage,
+    RSGeneratedFile, RSReportStatistics
 )
 from app.common.utils.calculations import calculate_tara_derived_columns
 from app.generators import generate_tara_excel_from_json, generate_tara_pdf_from_json
@@ -242,6 +244,307 @@ def get_generated_files_info(report_id: str, db: Session) -> Dict[str, Any]:
     return downloads
 
 
+def save_report_data_to_local(report_id: str, data: Dict[str, Any], db: Session):
+    """
+    保存报告数据到本地数据库 (rs_* 表)
+    
+    Args:
+        report_id: 报告ID
+        data: 从data-service获取的报告数据
+        db: 数据库会话
+    """
+    cover_data = data.get('cover', {})
+    definitions_data = data.get('definitions', {})
+    images_data = data.get('images', {})
+    assets_data = data.get('assets', {})
+    attack_trees_data = data.get('attack_trees', {})
+    tara_results_data = data.get('tara_results', {})
+    
+    # 1. 创建或更新报告主表
+    local_report = db.query(RSReport).filter(RSReport.report_id == report_id).first()
+    if not local_report:
+        local_report = RSReport(
+            report_id=report_id,
+            project_name=cover_data.get('project_name', ''),
+            report_title=cover_data.get('report_title', 'TARA报告'),
+            report_title_en=cover_data.get('report_title_en', ''),
+            data_level=cover_data.get('data_level', ''),
+            document_number=cover_data.get('document_number', ''),
+            version=cover_data.get('version', ''),
+            status='completed',
+            source_type='sync'
+        )
+        db.add(local_report)
+        db.flush()
+    
+    # 2. 保存封面信息
+    existing_cover = db.query(RSReportCover).filter(RSReportCover.report_id == report_id).first()
+    if existing_cover:
+        db.delete(existing_cover)
+        db.flush()
+    
+    cover = RSReportCover(
+        report_id=report_id,
+        report_title=cover_data.get('report_title', ''),
+        report_title_en=cover_data.get('report_title_en', ''),
+        project_name=cover_data.get('project_name', ''),
+        data_level=cover_data.get('data_level', ''),
+        document_number=cover_data.get('document_number', ''),
+        version=cover_data.get('version', ''),
+        author_date=cover_data.get('author_date', ''),
+        review_date=cover_data.get('review_date', ''),
+        sign_date=cover_data.get('sign_date', ''),
+        approve_date=cover_data.get('approve_date', '')
+    )
+    db.add(cover)
+    
+    # 3. 保存定义信息（包含图片路径）
+    existing_definitions = db.query(RSReportDefinitions).filter(RSReportDefinitions.report_id == report_id).first()
+    if existing_definitions:
+        db.delete(existing_definitions)
+        db.flush()
+    
+    definitions = RSReportDefinitions(
+        report_id=report_id,
+        title=definitions_data.get('title', ''),
+        functional_description=definitions_data.get('functional_description', ''),
+        item_boundary_image=images_data.get('item_boundary_image'),
+        system_architecture_image=images_data.get('system_architecture_image'),
+        software_architecture_image=images_data.get('software_architecture_image'),
+        dataflow_image=images_data.get('dataflow_image'),
+        assumptions=definitions_data.get('assumptions', []),
+        terminology=definitions_data.get('terminology', [])
+    )
+    db.add(definitions)
+    
+    # 4. 保存资产列表
+    db.query(RSReportAsset).filter(RSReportAsset.report_id == report_id).delete()
+    for i, asset in enumerate(assets_data.get('assets', [])):
+        asset_record = RSReportAsset(
+            report_id=report_id,
+            asset_id=asset.get('id', ''),
+            name=asset.get('name', ''),
+            category=asset.get('category', ''),
+            remarks=asset.get('remarks', ''),
+            authenticity=asset.get('authenticity', False),
+            integrity=asset.get('integrity', False),
+            non_repudiation=asset.get('non_repudiation', False),
+            confidentiality=asset.get('confidentiality', False),
+            availability=asset.get('availability', False),
+            authorization=asset.get('authorization', False),
+            sort_order=i
+        )
+        db.add(asset_record)
+    
+    # 5. 保存攻击树
+    db.query(RSReportAttackTree).filter(RSReportAttackTree.report_id == report_id).delete()
+    for i, tree in enumerate(attack_trees_data.get('attack_trees', [])):
+        tree_record = RSReportAttackTree(
+            report_id=report_id,
+            asset_id=tree.get('asset_id', ''),
+            asset_name=tree.get('asset_name', ''),
+            title=tree.get('title', ''),
+            image=tree.get('image', ''),
+            sort_order=i
+        )
+        db.add(tree_record)
+    
+    # 6. 保存TARA结果
+    db.query(RSReportTARAResult).filter(RSReportTARAResult.report_id == report_id).delete()
+    for i, result in enumerate(tara_results_data.get('results', [])):
+        tara_record = RSReportTARAResult(
+            report_id=report_id,
+            asset_id=result.get('asset_id', ''),
+            asset_name=result.get('asset_name', ''),
+            subdomain1=result.get('subdomain1', ''),
+            subdomain2=result.get('subdomain2', ''),
+            subdomain3=result.get('subdomain3', ''),
+            category=result.get('category', ''),
+            security_attribute=result.get('security_attribute', ''),
+            stride_model=result.get('stride_model', ''),
+            threat_scenario=result.get('threat_scenario', ''),
+            attack_path=result.get('attack_path', ''),
+            wp29_mapping=result.get('wp29_mapping', ''),
+            attack_vector=result.get('attack_vector', ''),
+            attack_complexity=result.get('attack_complexity', ''),
+            privileges_required=result.get('privileges_required', ''),
+            user_interaction=result.get('user_interaction', ''),
+            safety_impact=result.get('safety_impact', ''),
+            financial_impact=result.get('financial_impact', ''),
+            operational_impact=result.get('operational_impact', ''),
+            privacy_impact=result.get('privacy_impact', ''),
+            security_goal=result.get('security_goal', ''),
+            security_requirement=result.get('security_requirement', ''),
+            sort_order=i
+        )
+        db.add(tara_record)
+    
+    # 7. 更新统计信息
+    existing_stats = db.query(RSReportStatistics).filter(RSReportStatistics.report_id == report_id).first()
+    assets_count = len(assets_data.get('assets', []))
+    threats_count = len(tara_results_data.get('results', []))
+    attack_trees_count = len(attack_trees_data.get('attack_trees', []))
+    high_risk_count = sum(1 for r in tara_results_data.get('results', []) if r.get('operational_impact') in ['重大的', '严重的'])
+    
+    if existing_stats:
+        existing_stats.assets_count = assets_count
+        existing_stats.threats_count = threats_count
+        existing_stats.high_risk_count = high_risk_count
+        existing_stats.measures_count = threats_count
+        existing_stats.attack_trees_count = attack_trees_count
+    else:
+        stats = RSReportStatistics(
+            report_id=report_id,
+            assets_count=assets_count,
+            threats_count=threats_count,
+            high_risk_count=high_risk_count,
+            measures_count=threats_count,
+            attack_trees_count=attack_trees_count
+        )
+        db.add(stats)
+    
+    db.flush()
+
+
+def get_report_data_from_local(report_id: str, db: Session) -> Optional[Dict[str, Any]]:
+    """
+    从本地数据库 (rs_* 表) 读取报告数据
+    
+    Args:
+        report_id: 报告ID
+        db: 数据库会话
+    
+    Returns:
+        报告数据字典，如果不存在则返回 None
+    """
+    # 检查报告是否存在
+    local_report = db.query(RSReport).filter(RSReport.report_id == report_id).first()
+    if not local_report:
+        return None
+    
+    # 检查是否有完整数据（至少有封面数据）
+    cover = db.query(RSReportCover).filter(RSReportCover.report_id == report_id).first()
+    if not cover:
+        return None
+    
+    # 读取定义信息
+    definitions = db.query(RSReportDefinitions).filter(RSReportDefinitions.report_id == report_id).first()
+    
+    # 读取资产列表
+    assets = db.query(RSReportAsset).filter(
+        RSReportAsset.report_id == report_id
+    ).order_by(RSReportAsset.sort_order).all()
+    
+    # 读取攻击树
+    attack_trees = db.query(RSReportAttackTree).filter(
+        RSReportAttackTree.report_id == report_id
+    ).order_by(RSReportAttackTree.sort_order).all()
+    
+    # 读取TARA结果
+    tara_results = db.query(RSReportTARAResult).filter(
+        RSReportTARAResult.report_id == report_id
+    ).order_by(RSReportTARAResult.sort_order).all()
+    
+    # 构建返回数据
+    cover_data = {
+        "report_title": cover.report_title,
+        "report_title_en": cover.report_title_en,
+        "project_name": cover.project_name,
+        "data_level": cover.data_level,
+        "document_number": cover.document_number,
+        "version": cover.version,
+        "author_date": cover.author_date,
+        "review_date": cover.review_date,
+        "sign_date": cover.sign_date,
+        "approve_date": cover.approve_date
+    }
+    
+    definitions_data = {
+        "title": definitions.title if definitions else "",
+        "functional_description": definitions.functional_description if definitions else "",
+        "assumptions": definitions.assumptions or [] if definitions else [],
+        "terminology": definitions.terminology or [] if definitions else []
+    }
+    
+    images_data = {
+        "item_boundary_image": definitions.item_boundary_image if definitions else None,
+        "system_architecture_image": definitions.system_architecture_image if definitions else None,
+        "software_architecture_image": definitions.software_architecture_image if definitions else None,
+        "dataflow_image": definitions.dataflow_image if definitions else None
+    }
+    
+    assets_data = {
+        "title": f"{cover.project_name} - 资产列表 Asset List" if cover.project_name else "资产列表 Asset List",
+        "assets": [
+            {
+                "id": asset.asset_id,
+                "name": asset.name,
+                "category": asset.category,
+                "remarks": asset.remarks,
+                "authenticity": asset.authenticity,
+                "integrity": asset.integrity,
+                "non_repudiation": asset.non_repudiation,
+                "confidentiality": asset.confidentiality,
+                "availability": asset.availability,
+                "authorization": asset.authorization
+            }
+            for asset in assets
+        ]
+    }
+    
+    attack_trees_data = {
+        "title": "攻击树分析 Attack Tree Analysis",
+        "attack_trees": [
+            {
+                "asset_id": tree.asset_id,
+                "asset_name": tree.asset_name,
+                "title": tree.title,
+                "image": tree.image
+            }
+            for tree in attack_trees
+        ]
+    }
+    
+    tara_results_data = {
+        "title": "TARA分析结果 TARA Analysis Results",
+        "results": [
+            {
+                "asset_id": r.asset_id,
+                "asset_name": r.asset_name,
+                "subdomain1": r.subdomain1,
+                "subdomain2": r.subdomain2,
+                "subdomain3": r.subdomain3,
+                "category": r.category,
+                "security_attribute": r.security_attribute,
+                "stride_model": r.stride_model,
+                "threat_scenario": r.threat_scenario,
+                "attack_path": r.attack_path,
+                "wp29_mapping": r.wp29_mapping,
+                "attack_vector": r.attack_vector,
+                "attack_complexity": r.attack_complexity,
+                "privileges_required": r.privileges_required,
+                "user_interaction": r.user_interaction,
+                "safety_impact": r.safety_impact,
+                "financial_impact": r.financial_impact,
+                "operational_impact": r.operational_impact,
+                "privacy_impact": r.privacy_impact,
+                "security_goal": r.security_goal,
+                "security_requirement": r.security_requirement
+            }
+            for r in tara_results
+        ]
+    }
+    
+    return {
+        "cover": cover_data,
+        "definitions": definitions_data,
+        "images": images_data,
+        "assets": assets_data,
+        "attack_trees": attack_trees_data,
+        "tara_results": tara_results_data
+    }
+
+
 # ==================== API endpoints ====================
 
 @router.get("/reports")
@@ -281,15 +584,19 @@ async def get_report_info(report_id: str, db: Session = Depends(get_db)):
     """
     获取报告完整信息（用于预览）
     
-    从 data-service 获取报告数据
+    优先从本地 rs_* 表读取数据，如果不存在则从 data-service 获取
     """
-    # 从 data-service 获取报告数据
-    try:
-        data = await fetch_data_from_service(report_id)
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取报告数据失败: {str(e)}")
+    # 优先从本地数据库读取
+    data = get_report_data_from_local(report_id, db)
+    
+    # 如果本地没有数据，从 data-service 获取
+    if not data:
+        try:
+            data = await fetch_data_from_service(report_id)
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"获取报告数据失败: {str(e)}")
     
     cover_data = data.get('cover', {})
     definitions_data = data.get('definitions', {})
@@ -417,8 +724,7 @@ async def generate_report(
     """
     生成报告
     
-    从 data-service 获取数据，生成报告文件后上传到 MinIO
-    生成文件信息存储到本地数据库
+    从 data-service 获取数据，保存到本地 rs_* 表，生成报告文件后上传到 MinIO
     """
     # Prepare data from data-service
     try:
@@ -427,6 +733,16 @@ async def generate_report(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取报告数据失败: {str(e)}")
+    
+    # 保存数据到本地 rs_* 表（用于报告详情和预览）
+    try:
+        # 需要获取原始data（不包含本地图片路径）用于保存
+        original_data = await fetch_data_from_service(report_id)
+        save_report_data_to_local(report_id, original_data, db)
+        db.commit()
+    except Exception as e:
+        print(f"Warning: Failed to save report data to local: {e}")
+        # 不阻断报告生成流程
     
     # Create temporary file
     if format.lower() == "pdf":
@@ -593,14 +909,20 @@ async def download_report(
 async def preview_report(report_id: str, db: Session = Depends(get_db)):
     """
     获取报告预览数据
+    
+    优先从本地 rs_* 表读取数据，如果不存在则从 data-service 获取
     """
-    # Get data from data service
-    try:
-        data = await fetch_data_from_service(report_id)
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取报告数据失败: {str(e)}")
+    # 优先从本地数据库读取
+    data = get_report_data_from_local(report_id, db)
+    
+    # 如果本地没有数据，从 data-service 获取
+    if not data:
+        try:
+            data = await fetch_data_from_service(report_id)
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"获取报告数据失败: {str(e)}")
     
     # 获取本地存储的生成文件信息
     downloads = get_generated_files_info(report_id, db)

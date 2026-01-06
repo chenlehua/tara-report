@@ -214,47 +214,40 @@ http://report-service:8002
 
 获取报告完整信息。
 
+> **数据来源说明**: 优先从本地 `rs_*` 表读取数据，如果本地不存在则从 Data Service 获取。生成报告时会自动将数据保存到本地表。
+
 **时序图:**
 ```
-┌────────┐          ┌────────────────┐          ┌───────┐
-│ Client │          │ Report Service │          │ MySQL │
-└───┬────┘          └───────┬────────┘          └───┬───┘
-    │                       │                       │
-    │  GET /api/v1/reports/    │                       │
-    │  {report_id}          │                       │
-    │──────────────────────>│                       │
-    │                       │                       │
-    │                       │  Query report         │
-    │                       │──────────────────────>│
-    │                       │                       │
-    │                       │  Query cover          │
-    │                       │──────────────────────>│
-    │                       │                       │
-    │                       │  Query definitions    │
-    │                       │──────────────────────>│
-    │                       │                       │
-    │                       │  Query assets         │
-    │                       │──────────────────────>│
-    │                       │                       │
-    │                       │  Query attack_trees   │
-    │                       │──────────────────────>│
-    │                       │                       │
-    │                       │  Query tara_results   │
-    │                       │──────────────────────>│
-    │                       │                       │
-    │                       │  Query generated_files│
-    │                       │──────────────────────>│
-    │                       │                       │
-    │                       │  Build response       │
-    │                       │───────┐               │
-    │                       │       │               │
-    │                       │<──────┘               │
-    │                       │                       │
-    │  { report data,       │                       │
-    │    statistics,        │                       │
-    │    downloads }        │                       │
-    │<──────────────────────│                       │
-    │                       │                       │
+┌────────┐          ┌────────────────┐          ┌───────┐          ┌──────────────┐
+│ Client │          │ Report Service │          │ MySQL │          │ Data Service │
+└───┬────┘          └───────┬────────┘          └───┬───┘          └──────┬───────┘
+    │                       │                       │                      │
+    │  GET /api/v1/reports/    │                       │                      │
+    │  {report_id}          │                       │                      │
+    │──────────────────────>│                       │                      │
+    │                       │                       │                      │
+    │                       │  Query rs_* tables    │                      │
+    │                       │──────────────────────>│                      │
+    │                       │                       │                      │
+    │                       │  [If local data exists]                      │
+    │                       │  Return local data    │                      │
+    │                       │<──────────────────────│                      │
+    │                       │                       │                      │
+    │                       │  [If no local data]   │                      │
+    │                       │  Fetch from data-service                     │
+    │                       │─────────────────────────────────────────────>│
+    │                       │                       │                      │
+    │                       │  Calculate TARA       │                      │
+    │                       │  derived columns      │                      │
+    │                       │───────┐               │                      │
+    │                       │       │               │                      │
+    │                       │<──────┘               │                      │
+    │                       │                       │                      │
+    │  { report data,       │                       │                      │
+    │    statistics,        │                       │                      │
+    │    downloads }        │                       │                      │
+    │<──────────────────────│                       │                      │
+    │                       │                       │                      │
 ```
 
 **路径参数:**
@@ -431,6 +424,8 @@ http://report-service:8002
 
 生成报告文件（Excel或PDF）。
 
+> **数据保存**: 生成报告时会自动将报告数据保存到本地 `rs_*` 表，以便后续报告详情和预览时快速读取。
+
 **时序图:**
 ```
 ┌────────┐          ┌────────────────┐          ┌──────────────┐          ┌───────┐          ┌───────┐
@@ -442,27 +437,28 @@ http://report-service:8002
     │  ?format=xlsx         │                          │                      │                  │
     │──────────────────────>│                          │                      │                  │
     │                       │                          │                      │                  │
-    │                       │  Check report exists     │                      │                  │
-    │                       │─────────────────────────────────────────────────>│                  │
-    │                       │                          │                      │                  │
     │                       │  GET cover, definitions, │                      │                  │
-    │                       │  assets, attack-trees,   │                      │                  │
-    │                       │  tara-results            │                      │                  │
+    │                       │  images, assets,         │                      │                  │
+    │                       │  attack-trees, tara-results                     │                  │
     │                       │─────────────────────────>│                      │                  │
+    │                       │                          │                      │                  │
+    │                       │  Save to rs_* tables     │                      │                  │
+    │                       │─────────────────────────────────────────────────>│                  │
     │                       │                          │                      │                  │
     │                       │  [For each image]        │                      │                  │
     │                       │  Download from MinIO     │                      │                  │
     │                       │─────────────────────────────────────────────────────────────────────>│
     │                       │                          │                      │                  │
-    │                       │  Generate Excel/PDF      │                      │                  │
+    │                       │  Calculate TARA derived  │                      │                  │
+    │                       │  columns & Generate file │                      │                  │
     │                       │───────┐                  │                      │                  │
     │                       │       │                  │                      │                  │
     │                       │<──────┘                  │                      │                  │
     │                       │                          │                      │                  │
-    │                       │  Upload to MinIO         │                      │                  │
+    │                       │  Upload report to MinIO  │                      │                  │
     │                       │─────────────────────────────────────────────────────────────────────>│
     │                       │                          │                      │                  │
-    │                       │  Save generated_report   │                      │                  │
+    │                       │  Save generated_file     │                      │                  │
     │                       │─────────────────────────────────────────────────>│                  │
     │                       │                          │                      │                  │
     │  { success,           │                          │                      │                  │
@@ -470,6 +466,15 @@ http://report-service:8002
     │<──────────────────────│                          │                      │                  │
     │                       │                          │                      │                  │
 ```
+
+**保存的本地表:**
+- `rs_reports` - 报告主表
+- `rs_report_covers` - 封面信息
+- `rs_report_definitions` - 定义信息（含图片路径）
+- `rs_report_assets` - 资产列表
+- `rs_report_attack_trees` - 攻击树
+- `rs_report_tara_results` - TARA分析结果
+- `rs_report_statistics` - 统计信息
 
 **路径参数:**
 
@@ -569,35 +574,40 @@ http://report-service:8002
 
 获取报告预览数据，包含完整的报告内容和后端自动计算的TARA派生列。
 
+> **数据来源说明**: 优先从本地 `rs_*` 表读取数据，如果本地不存在则从 Data Service 获取。生成报告时会自动将数据保存到本地表。
+
 **时序图:**
 ```
-┌────────┐          ┌────────────────┐          ┌──────────────┐          ┌───────┐
-│ Client │          │ Report Service │          │ Data Service │          │ MySQL │
-└───┬────┘          └───────┬────────┘          └──────┬───────┘          └───┬───┘
-    │                       │                          │                      │
-    │  GET /api/v1/reports/    │                          │                      │
-    │  {id}/preview         │                          │                      │
-    │──────────────────────>│                          │                      │
-    │                       │                          │                      │
-    │                       │  GET cover, definitions, │                      │
-    │                       │  assets, attack-trees,   │                      │
-    │                       │  tara-results (原始数据) │                      │
-    │                       │─────────────────────────>│                      │
-    │                       │                          │                      │
-    │                       │  Calculate TARA derived  │                      │
-    │                       │  columns locally         │                      │
-    │                       │───────┐                  │                      │
-    │                       │       │                  │                      │
-    │                       │<──────┘                  │                      │
-    │                       │                          │                      │
-    │                       │  Query generated_files   │                      │
-    │                       │─────────────────────────────────────────────────>│
-    │                       │                          │                      │
-    │  { preview data,      │                          │                      │
-    │    with calculated    │                          │                      │
-    │    columns }          │                          │                      │
-    │<──────────────────────│                          │                      │
-    │                       │                          │                      │
+┌────────┐          ┌────────────────┐          ┌───────┐          ┌──────────────┐
+│ Client │          │ Report Service │          │ MySQL │          │ Data Service │
+└───┬────┘          └───────┬────────┘          └───┬───┘          └──────┬───────┘
+    │                       │                       │                      │
+    │  GET /api/v1/reports/    │                       │                      │
+    │  {id}/preview         │                       │                      │
+    │──────────────────────>│                       │                      │
+    │                       │                       │                      │
+    │                       │  Query rs_* tables    │                      │
+    │                       │──────────────────────>│                      │
+    │                       │                       │                      │
+    │                       │  [If local data exists]                      │
+    │                       │  Use local data       │                      │
+    │                       │<──────────────────────│                      │
+    │                       │                       │                      │
+    │                       │  [If no local data]   │                      │
+    │                       │  Fetch from data-service                     │
+    │                       │─────────────────────────────────────────────>│
+    │                       │                       │                      │
+    │                       │  Calculate TARA       │                      │
+    │                       │  derived columns      │                      │
+    │                       │───────┐               │                      │
+    │                       │       │               │                      │
+    │                       │<──────┘               │                      │
+    │                       │                       │                      │
+    │  { preview data,      │                       │                      │
+    │    with calculated    │                       │                      │
+    │    columns }          │                       │                      │
+    │<──────────────────────│                       │                      │
+    │                       │                       │                      │
 ```
 
 **响应说明:**
