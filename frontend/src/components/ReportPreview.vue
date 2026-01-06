@@ -552,14 +552,10 @@ function getImageUrl(imagePath?: string): string {
   if (imagePath.startsWith('/api/')) {
     return imagePath
   }
-  // 如果是文件路径，提取文件名并构建API路径
-  const filename = imagePath.split('/').pop()
-  if (filename) {
-    // 尝试从文件名中提取图片ID
-    const match = filename.match(/^(IMG-[a-f0-9]+)/i)
-    if (match) {
-      return `/api/v1/images/${match[1]}`
-    }
+  // 对于其他路径（MinIO路径等），使用当前报告的 image-by-path 接口
+  // 注意：这需要 report_id 存在
+  if (props.reportId && imagePath) {
+    return `/api/v1/reports/${props.reportId}/image-by-path?path=${encodeURIComponent(imagePath)}`
   }
   return imagePath
 }

@@ -120,9 +120,14 @@ export async function uploadImage(file: File, type: string): Promise<{ filename:
   return response.data
 }
 
-// 获取图片URL
-export function getImageUrl(filename: string): string {
-  return `/api/v1/images/${filename}`
+// 获取图片URL (通过报告的 image-by-path 接口)
+export function getImageUrl(reportId: string, imagePath: string): string {
+  if (!imagePath) return ''
+  // 如果已经是完整的API路径，直接返回
+  if (imagePath.startsWith('/api/')) {
+    return imagePath
+  }
+  return `/api/v1/reports/${reportId}/image-by-path?path=${encodeURIComponent(imagePath)}`
 }
 
 export default api

@@ -475,57 +475,5 @@ async def get_report_tara_results(report_id: str, db: Session = Depends(get_db))
     }
 
 
-@router.get("/reports/{report_id}/images/{image_id}")
-async def get_report_image(report_id: str, image_id: str, db: Session = Depends(get_db)):
-    """Get image"""
-    image = db.query(ReportImage).filter(
-        ReportImage.report_id == report_id,
-        ReportImage.image_id == image_id
-    ).first()
-    
-    if not image:
-        raise HTTPException(status_code=404, detail="图片不存在")
-    
-    try:
-        minio = get_minio_client()
-        content = minio.download_file(image.minio_bucket, image.minio_path)
-        return StreamingResponse(
-            io.BytesIO(content),
-            media_type=image.content_type or "image/png"
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取图片失败: {str(e)}")
-
-
-@router.get("/reports/{report_id}/image-by-path")
-async def get_image_by_path(report_id: str, path: str, db: Session = Depends(get_db)):
-    """Get image by MinIO path"""
-    try:
-        minio = get_minio_client()
-        # Path format: bucket/object_name or just object_name
-        if "/" in path and not path.startswith(report_id):
-            bucket, object_name = path.split("/", 1)
-        else:
-            bucket = settings.BUCKET_IMAGES
-            object_name = path
-        
-        content = minio.download_file(bucket, object_name)
-        
-        # Determine content_type based on file extension
-        ext = Path(object_name).suffix.lower()
-        content_types = {
-            '.png': 'image/png',
-            '.jpg': 'image/jpeg',
-            '.jpeg': 'image/jpeg',
-            '.gif': 'image/gif',
-            '.svg': 'image/svg+xml',
-            '.bmp': 'image/bmp'
-        }
-        content_type = content_types.get(ext, 'image/png')
-        
-        return StreamingResponse(
-            io.BytesIO(content),
-            media_type=content_type
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取图片失败: {str(e)}")
+# 注意: 图片获取接口已移至 report-service
+# 请使用 report-service 的 /reports/{report_id}/image-by-path 接口获取图片

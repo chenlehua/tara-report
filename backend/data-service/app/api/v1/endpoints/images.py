@@ -94,38 +94,10 @@ async def upload_image(
         "success": True,
         "message": "图片上传成功",
         "image_id": image_id,
-        "image_url": f"/api/v1/images/{image_id}",
+        "minio_path": object_name,
         "image_type": image_type
     }
 
 
-@router.get("/images/{image_id}")
-async def get_image(image_id: str, db: Session = Depends(get_db)):
-    """Get image"""
-    # First check temporary storage
-    if image_id in temp_images_db:
-        image_info = temp_images_db[image_id]
-        try:
-            minio = get_minio_client()
-            content = minio.download_file(settings.BUCKET_IMAGES, image_info['minio_path'])
-            return StreamingResponse(
-                io.BytesIO(content),
-                media_type=image_info.get('content_type', 'image/png')
-            )
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"获取图片失败: {str(e)}")
-    
-    # Query from database
-    image = db.query(ReportImage).filter(ReportImage.image_id == image_id).first()
-    if not image:
-        raise HTTPException(status_code=404, detail="图片不存在")
-    
-    try:
-        minio = get_minio_client()
-        content = minio.download_file(image.minio_bucket, image.minio_path)
-        return StreamingResponse(
-            io.BytesIO(content),
-            media_type=image.content_type or "image/png"
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取图片失败: {str(e)}")
+# 注意: /images/{image_id} 端点已移除
+# 请使用 /reports/{report_id}/image-by-path?path={minio_path} 获取图片
