@@ -289,9 +289,58 @@ http://report-service:8002
   "definitions": {...},
   "assets": {...},
   "attack_trees": {...},
-  "tara_results": {...}
+  "tara_results": {
+    "title": "TARA分析结果 TARA Analysis Results",
+    "results": [
+      {
+        // 基础字段
+        "asset_id": "AS001",
+        "asset_name": "车载诊断数据",
+        "stride_model": "I信息泄露",
+        "attack_vector": "物理",
+        "attack_complexity": "低",
+        "privileges_required": "无",
+        "user_interaction": "不需要",
+        "safety_impact": "可忽略不计的",
+        "financial_impact": "中等的",
+        "operational_impact": "中等的",
+        "privacy_impact": "重大的",
+        // ... 其他基础字段
+        
+        // 攻击可行性计算字段（后端自动生成）
+        "attack_vector_value": 0.2,
+        "attack_complexity_value": 0.77,
+        "privileges_required_value": 0.85,
+        "user_interaction_value": 0.85,
+        "attack_feasibility_value": 0.91,
+        "attack_feasibility_level": "很低",
+        
+        // 影响分析计算字段（后端自动生成）
+        "safety_impact_value": 0,
+        "financial_impact_value": 1,
+        "operational_impact_value": 1,
+        "privacy_impact_value": 10,
+        "total_impact_value": 12,
+        "impact_level": "中等的",
+        
+        // 影响注释字段（后端自动生成）
+        "safety_note": "没有受伤",
+        "financial_note": "财务损失会产生中等影响",
+        "operational_note": "操作损坏会导致车辆功能中等减少",
+        "privacy_note": "隐私危害会产生重大影响",
+        
+        // 风险评估计算字段（后端自动生成）
+        "risk_level": "Low",
+        "risk_treatment": "保留风险",
+        "calculated_security_goal": "/",
+        "wp29_control_mapping": "M11"
+      }
+    ]
+  }
 }
 ```
+
+> **注意**: `tara_results.results` 中的每条记录包含后端自动计算的派生列，详细字段说明请参考 [Data Service API - TARA Results](./DATA_SERVICE_API.md#get-apiv1reportsreport_idtara-results)。
 
 **错误响应:**
 
@@ -518,7 +567,7 @@ http://report-service:8002
 
 #### GET /api/v1/reports/{report_id}/preview
 
-获取报告预览数据。
+获取报告预览数据，包含完整的报告内容和后端自动计算的TARA派生列。
 
 **时序图:**
 ```
@@ -532,7 +581,7 @@ http://report-service:8002
     │                       │                          │                      │
     │                       │  GET cover, definitions, │                      │
     │                       │  assets, attack-trees,   │                      │
-    │                       │  tara-results            │                      │
+    │                       │  tara-results (含计算列)  │                      │
     │                       │─────────────────────────>│                      │
     │                       │                          │                      │
     │                       │  Query generated_files   │                      │
@@ -546,6 +595,17 @@ http://report-service:8002
     │<──────────────────────│                          │                      │
     │                       │                          │                      │
 ```
+
+**响应说明:**
+
+预览数据包含与报告详情相同的结构，其中 `tara_results` 部分包含后端自动计算的派生列：
+
+- **攻击可行性计算**: attack_vector_value, attack_complexity_value, privileges_required_value, user_interaction_value, attack_feasibility_value, attack_feasibility_level
+- **影响分析计算**: safety_impact_value, financial_impact_value, operational_impact_value, privacy_impact_value, total_impact_value, impact_level
+- **影响注释**: safety_note, financial_note, operational_note, privacy_note
+- **风险评估计算**: risk_level, risk_treatment, calculated_security_goal, wp29_control_mapping
+
+前端可直接使用这些预计算的值进行展示，无需在客户端重复计算。
 
 ---
 
@@ -630,7 +690,7 @@ PDF报告包含与Excel相同的内容，支持中文字体显示。
 | GET /api/v1/reports/{report_id}/definitions | 获取定义数据 |
 | GET /api/v1/reports/{report_id}/assets | 获取资产数据 |
 | GET /api/v1/reports/{report_id}/attack-trees | 获取攻击树数据 |
-| GET /api/v1/reports/{report_id}/tara-results | 获取TARA结果数据 |
+| GET /api/v1/reports/{report_id}/tara-results | 获取TARA结果数据（含后端自动计算的派生列） |
 
 ### MinIO
 
