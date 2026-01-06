@@ -218,7 +218,7 @@ clean-all:
 # 查看服务状态
 status:
 	@echo "📊 服务状态:"
-	docker compose ps
+	docker compose ps -a
 
 # 查看容器状态(别名)
 ps: status
@@ -231,15 +231,16 @@ list:
 	@echo ""
 	@echo "📋 容器运行状态:"
 	@echo "────────────────────────────────────────────────────────────────────────────────"
-	@docker compose ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null || docker compose ps
+	@docker compose ps -a --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null || docker compose ps -a
 	@echo ""
 	@echo "🏥 健康检查状态:"
 	@echo "────────────────────────────────────────────────────────────────────────────────"
 	@for service in $(HEALTH_SERVICES); do \
-		container=$$(docker compose ps -q $$service 2>/dev/null); \
+		container=$$(docker compose ps -a -q $$service 2>/dev/null); \
 		if [ -n "$$container" ]; then \
 			status=$$(docker inspect --format='{{.State.Status}}' $$container 2>/dev/null); \
 			health=$$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}N/A{{end}}' $$container 2>/dev/null); \
+			exitcode=$$(docker inspect --format='{{.State.ExitCode}}' $$container 2>/dev/null); \
 			if [ "$$status" = "running" ]; then \
 				if [ "$$health" = "healthy" ]; then \
 					printf "  ✅ %-20s 运行中    健康\n" "$$service"; \
@@ -250,8 +251,20 @@ list:
 				else \
 					printf "  ✅ %-20s 运行中    无健康检查\n" "$$service"; \
 				fi; \
+			elif [ "$$status" = "exited" ]; then \
+				if [ "$$exitcode" = "0" ]; then \
+					printf "  ⏹️  %-20s 已退出    正常退出(0)\n" "$$service"; \
+				else \
+					printf "  ❌ %-20s 已退出    异常退出($$exitcode)\n" "$$service"; \
+				fi; \
+			elif [ "$$status" = "restarting" ]; then \
+				printf "  🔄 %-20s 重启中\n" "$$service"; \
+			elif [ "$$status" = "paused" ]; then \
+				printf "  ⏸️  %-20s 已暂停\n" "$$service"; \
+			elif [ "$$status" = "dead" ]; then \
+				printf "  💀 %-20s 已死亡\n" "$$service"; \
 			else \
-				printf "  ⭕ %-20s 未运行\n" "$$service"; \
+				printf "  ⭕ %-20s $$status\n" "$$service"; \
 			fi; \
 		else \
 			printf "  ⭕ %-20s 未启动\n" "$$service"; \
