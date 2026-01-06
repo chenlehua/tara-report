@@ -54,8 +54,8 @@ up:
 	@echo "   数据服务文档: http://localhost:8001/docs"
 	@echo "   报告服务API: http://localhost:8002"
 	@echo "   报告服务文档: http://localhost:8002/docs"
-	@echo "   MinIO控制台: http://localhost:9001 (minioadmin/minioadmin123)"
-	@echo "   phpMyAdmin: http://localhost:8080 (root/root123456)"
+	@echo "   MinIO控制台: http://localhost:30032 (minioadmin/minioadmin123)"
+	@echo "   phpMyAdmin: http://localhost:30033 (root/root123456)"
 
 # 停止服务
 down:
