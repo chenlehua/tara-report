@@ -33,26 +33,70 @@ router = APIRouter()
 
 # ==================== Helper functions ====================
 
-async def fetch_report_list_from_data_service(page: int = 1, page_size: int = 20) -> Dict[str, Any]:
+def get_report_list_from_local(page: int, page_size: int, db: Session) -> Dict[str, Any]:
     """
-    从 data-service 获取报告列表
+    从本地数据库获取报告列表
+    
+    Args:
+        page: 页码
+        page_size: 每页数量
+        db: 数据库会话
+    
+    Returns:
+        报告列表数据
     """
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        try:
-            # 获取报告列表（通过查询 data-service 的数据库）
-            # 由于 data-service 没有专门的列表接口，我们需要获取所有报告的基本信息
-            # 这里我们假设 data-service 有一个列表接口，如果没有则需要添加
-            resp = await client.get(
-                f"{settings.DATA_SERVICE_URL}/api/v1/reports",
-                params={"page": page, "page_size": page_size}
-            )
-            if resp.status_code == 200:
-                return resp.json()
-            else:
-                return {"success": True, "total": 0, "page": page, "page_size": page_size, "reports": []}
-        except Exception as e:
-            print(f"Failed to fetch report list from data service: {e}")
-            return {"success": True, "total": 0, "page": page, "page_size": page_size, "reports": []}
+    from sqlalchemy import func
+    
+    # 计算总数
+    total = db.query(func.count(RSReport.id)).scalar() or 0
+    
+    # 分页查询
+    offset = (page - 1) * page_size
+    reports = db.query(RSReport).order_by(
+        RSReport.created_at.desc()
+    ).offset(offset).limit(page_size).all()
+    
+    # 构建返回数据
+    report_list = []
+    for report in reports:
+        # 获取封面信息
+        cover = db.query(RSReportCover).filter(
+            RSReportCover.report_id == report.report_id
+        ).first()
+        
+        # 获取统计信息
+        stats = db.query(RSReportStatistics).filter(
+            RSReportStatistics.report_id == report.report_id
+        ).first()
+        
+        report_data = {
+            "report_id": report.report_id,
+            "project_name": report.project_name or (cover.project_name if cover else ""),
+            "report_title": report.report_title or (cover.report_title if cover else "TARA报告"),
+            "report_title_en": report.report_title_en or (cover.report_title_en if cover else ""),
+            "data_level": report.data_level or (cover.data_level if cover else ""),
+            "document_number": report.document_number or (cover.document_number if cover else ""),
+            "version": report.version or (cover.version if cover else ""),
+            "status": report.status or "completed",
+            "created_at": report.created_at.isoformat() if report.created_at else None,
+            "updated_at": report.updated_at.isoformat() if report.updated_at else None,
+            "statistics": {
+                "assets_count": stats.assets_count if stats else 0,
+                "threats_count": stats.threats_count if stats else 0,
+                "high_risk_count": stats.high_risk_count if stats else 0,
+                "measures_count": stats.measures_count if stats else 0,
+                "attack_trees_count": stats.attack_trees_count if stats else 0
+            } if stats else None
+        }
+        report_list.append(report_data)
+    
+    return {
+        "success": True,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "reports": report_list
+    }
 
 
 async def fetch_data_from_service(report_id: str) -> Dict[str, Any]:
@@ -556,13 +600,13 @@ async def list_reports(
     """
     获取报告列表
     
-    从 data-service 获取报告数据，并补充本地的生成文件信息
+    从本地 rs_report 表获取报告数据，并补充生成文件信息
     """
-    # 从 data-service 获取报告列表
-    data_service_result = await fetch_report_list_from_data_service(page, page_size)
+    # 从本地数据库获取报告列表
+    result = get_report_list_from_local(page, page_size, db)
     
-    # 如果 data-service 返回了数据，补充生成文件信息
-    reports = data_service_result.get("reports", [])
+    # 补充生成文件信息
+    reports = result.get("reports", [])
     for report in reports:
         report_id = report.get("report_id")
         if report_id:
@@ -570,13 +614,7 @@ async def list_reports(
             downloads = get_generated_files_info(report_id, db)
             report["downloads"] = downloads
     
-    return {
-        "success": True,
-        "total": data_service_result.get("total", 0),
-        "page": page,
-        "page_size": page_size,
-        "reports": reports
-    }
+    return result
 
 
 @router.get("/reports/{report_id}")
