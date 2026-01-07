@@ -679,7 +679,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { getReport, getDownloadUrl, getPdfDownloadUrl, getImageUrl } from '@/api'
+import { getReport, getDownloadUrl, getPdfDownloadUrl } from '@/api'
 
 const route = useRoute()
 const isLoading = ref(true)
@@ -808,12 +808,13 @@ function formatDate(dateStr) {
 
 function getImageSrc(imagePath) {
   if (!imagePath) return ''
+  // 如果已经是完整的API路径，直接返回
   if (imagePath.startsWith('/api/')) return imagePath
   if (imagePath.startsWith('http')) return imagePath
-  // 从路径中提取图片ID
-  const match = imagePath.match(/IMG-[a-f0-9]+/i)
-  if (match) {
-    return getImageUrl(match[0])
+  // 使用当前报告的 image-by-path 接口
+  const reportId = report.value?.id || report.value?.report_id || route.params.id
+  if (reportId && imagePath) {
+    return `/api/v1/reports/${reportId}/image-by-path?path=${encodeURIComponent(imagePath)}`
   }
   return imagePath
 }
