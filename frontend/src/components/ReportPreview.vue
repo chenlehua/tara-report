@@ -174,10 +174,10 @@
     </div>
 
     <!-- 攻击树 -->
-    <div class="section-card" v-if="previewData.attack_trees?.length">
-      <h3><el-icon><Share /></el-icon> 攻击树 ({{ previewData.attack_trees.length }})</h3>
+    <div class="section-card" v-if="attackTreesList?.length">
+      <h3><el-icon><Share /></el-icon> 攻击树 ({{ attackTreesList.length }})</h3>
       <div class="attack-trees-grid">
-        <div class="attack-tree-item" v-for="(tree, index) in previewData.attack_trees" :key="index">
+        <div class="attack-tree-item" v-for="(tree, index) in attackTreesList" :key="index">
           <div class="tree-header">
             <span class="tree-asset">{{ tree.asset_id }} - {{ tree.asset_name }}</span>
             <span class="tree-title" v-if="tree.title">{{ tree.title }}</span>
@@ -509,6 +509,19 @@ const hasDefinitionImages = computed(() => {
          defs?.system_architecture_image || 
          defs?.software_architecture_image ||
          props.previewData.dataflow_image
+})
+
+// 处理攻击树数据，支持两种格式
+const attackTreesList = computed(() => {
+  const attackTrees = props.previewData?.attack_trees
+  if (!attackTrees) return []
+  // 如果是数组，直接返回
+  if (Array.isArray(attackTrees)) return attackTrees
+  // 如果是对象，返回内部的 attack_trees 数组
+  if (attackTrees.attack_trees && Array.isArray(attackTrees.attack_trees)) {
+    return attackTrees.attack_trees
+  }
+  return []
 })
 
 // 处理假设数据，支持多种格式
